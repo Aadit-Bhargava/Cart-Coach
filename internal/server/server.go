@@ -1,0 +1,44 @@
+package server
+
+import (
+	"context"
+	"errors"
+	"net"
+	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"go.uber.org/fx"
+
+	"github.com/aaditbhargava/cart-coach/internal/config"
+	"github.com/aaditbhargava/cart-coach/internal/handler"
+)
+
+// NewEngine builds the gin engine and registers all routes.
+func NewEngine(db *handler.DatabaseHandler, users *handler.UserHandler) *gin.Engine {
+	r := gin.New()
+	r.Use(gin.Logger(), gin.Recovery())
+	db.Register(r)
+	users.Register(r)
+	return r
+}
+
+// Start runs the HTTP server for the lifetime of the fx app.
+func Start(lc fx.Lifecycle, cfg *config.Config, engine *gin.Engine) {
+	srv := &http.Server{Addr: ":" + cfg.Port, Handler: engine}
+
+	lc.Append(fx.Hook{
+		OnStart: func(context.Context) error {
+			ln, err := net.Listen("tcp", srv.Addr)
+			if err != nil {
+				return err
+			}
+			go func() {
+				if err := srv.Serve(ln); err != nil && !errors.Is(err, http.ErrServerClosed) {
+					panic(err)
+				}
+			}()
+			return nil
+		},
+		OnStop: srv.Shutdown,
+	})
+}
