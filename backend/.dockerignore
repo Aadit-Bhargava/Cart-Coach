@@ -1,0 +1,8 @@
+.git
+.gitignore
+.claude
+.vscode
+.env
+.env.*
+!.env.example
+bin/
