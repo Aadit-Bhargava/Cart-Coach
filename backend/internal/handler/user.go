@@ -21,6 +21,7 @@ func NewUserHandler(users *repository.UserRepository) *UserHandler {
 // Register mounts the handler's routes on the engine.
 func (h *UserHandler) Register(r *gin.Engine) {
 	r.POST("/users", h.Create)
+	r.GET("/users", h.GetByEmail)
 }
 
 type createUserRequest struct {
@@ -46,4 +47,24 @@ func (h *UserHandler) Create(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusCreated, user)
+}
+
+// GetByEmail returns the user whose email is given in the ?email= query param.
+func (h *UserHandler) GetByEmail(c *gin.Context) {
+	email := c.Query("email")
+	if email == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "email query parameter is required"})
+		return
+	}
+
+	user, err := h.users.GetByEmail(c.Request.Context(), email)
+	if errors.Is(err, repository.ErrUserNotFound) {
+		c.JSON(http.StatusNotFound, gin.H{"error": err.Error()})
+		return
+	}
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not fetch user"})
+		return
+	}
+	c.JSON(http.StatusOK, user)
 }
