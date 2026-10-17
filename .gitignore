@@ -1,4 +1,5 @@
 .env
-/bin/
+bin/
 .claude/
 __debug_bin*
+.vscode/launch.json
