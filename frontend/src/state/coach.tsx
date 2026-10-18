@@ -2,6 +2,7 @@ import { useMutation } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useRef, type ReactNode } from "react";
 import { api } from "@/api";
 import { plural } from "@/lib/format";
+import { detailsComplete } from "@/lib/target";
 import { useCatalog } from "./catalog";
 import { useDispatch, useStore } from "./store";
 
@@ -68,7 +69,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
   );
 
   useEffect(() => {
-    if (!profile?.auto_add || userItems.length === 0) {
+    if (!profile?.auto_add || !detailsComplete(profile) || userItems.length === 0) {
       latest.current++;
       reset();
       if (coachIds.current.length) dispatch({ type: "clearSuggestions" });

@@ -1,5 +1,6 @@
 import type { Diet, Profile } from "@/api/types";
-import { inr } from "./format";
+import { inr, plural } from "./format";
+import { detailsComplete } from "./target";
 
 export const DIET_LABEL: Record<Diet, string> = {
   veg: "Vegetarian",
@@ -9,10 +10,10 @@ export const DIET_LABEL: Record<Diet, string> = {
   unknown: "Diet not set",
 };
 
-/** "110 g protein, vegetarian, avoids peanuts, likes paneer, budget ₹600" */
+/** "110 g protein a day for 3 days, vegetarian, avoids peanuts, likes paneer, budget ₹600" */
 export function describeProfile(p: Profile): string {
   return [
-    `${p.protein_target_g} g protein`,
+    detailsComplete(p) ? `${p.daily_protein_g} g protein a day for ${plural(p.days, "day", "days")}` : "protein target not set",
     DIET_LABEL[p.diet].toLowerCase(),
     p.allergies.length ? `avoids ${p.allergies.join(" and ")}` : "",
     p.likes.length ? `likes ${p.likes.join(", ")}` : "",

@@ -91,6 +91,7 @@ function Shop() {
   }, [products, category, query, sort]);
 
   const product = activeOverlay?.kind === "product" ? byId.get(activeOverlay.id) : undefined;
+  const openDetails = () => setOverlay({ kind: "goal", first: false, mode: "details" });
   const openGoal = () => setOverlay({ kind: "goal", first: false, mode: "full" });
   const openLog = () => setOverlay({ kind: "log" });
   const resetPage = () => setShown(PAGE);
@@ -172,7 +173,7 @@ function Shop() {
 
         {wide && (
           <aside aria-label="Your cart" className="sticky top-[92px] self-start">
-            <CartPanel byId={byId} onGoal={openGoal} onLog={openLog} className="max-h-[calc(100dvh-112px)]" />
+            <CartPanel byId={byId} onGoal={openGoal} onDetails={openDetails} onLog={openLog} className="max-h-[calc(100dvh-112px)]" />
           </aside>
         )}
       </div>
@@ -200,6 +201,10 @@ function Shop() {
             onGoal={() => {
               setRailOpen(false);
               openGoal();
+            }}
+            onDetails={() => {
+              setRailOpen(false);
+              openDetails();
             }}
             onLog={() => {
               setRailOpen(false);

@@ -1,4 +1,5 @@
 import type { Profile } from "@/api/types";
+import { detailsComplete } from "@/lib/target";
 
 interface Props {
   query: string;
@@ -46,7 +47,7 @@ export function TopBar({ query, onQuery, profile, onGoal, count, onCart, showCar
           )}
           <button type="button" onClick={onGoal} className="flex h-12 items-center gap-2 rounded-2xl bg-coach-tint px-4 font-bold text-coach">
             Goal
-            <span className="hidden font-medium text-ink sm:inline">{profile ? `${profile.protein_target_g} g protein` : "Set your goal"}</span>
+            <span className="hidden font-medium text-ink sm:inline">{profile ? (detailsComplete(profile) ? `${profile.daily_protein_g} g a day` : "Add details") : "Set your goal"}</span>
           </button>
           {showCartButton && (
             <button type="button" onClick={onCart} aria-label={`Open cart, ${count} items`} className="relative grid size-12 place-items-center rounded-2xl bg-ink text-white">
