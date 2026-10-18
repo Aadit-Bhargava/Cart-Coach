@@ -81,7 +81,7 @@ export const demoApi: CartCoachApi = {
       return product ? [{ product, quantity: l.quantity }] : [];
     });
     const asked = (preference ?? "").replace(/\s+/g, " ").trim();
-    const { picks, matches } = pickSuggestions({ products: views, profile, cart: lines, excluded: excluded_product_ids ?? [], preference: asked });
+    const { picks, matches, miss } = pickSuggestions({ products: views, profile, cart: lines, excluded: excluded_product_ids ?? [], preference: asked });
     const protein = picks.reduce((a, p) => a + (p.packProtein ?? 0), 0);
     const cost = picks.reduce((a, p) => a + p.price, 0);
     return {
@@ -97,7 +97,7 @@ export const demoApi: CartCoachApi = {
             detail: picks.map(sourceFor).join(" | "),
           }
         : { title: "No suggestions needed", detail: "Your goal is covered, or nothing fits your details and budget." },
-      message: picks.length ? preferenceMessage(asked, matches) || undefined : undefined,
+      message: preferenceMessage(asked, matches, miss) || undefined,
     };
   },
 };

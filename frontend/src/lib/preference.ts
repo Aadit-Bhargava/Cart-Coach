@@ -27,9 +27,43 @@ export function matchesWords(name: string, words: string[]): boolean {
   return words.some((w) => text.includes(w));
 }
 
-/** A plain explanation for when nothing eligible matched the request. */
-export function preferenceMessage(preference: string, matches: number): string {
+/**
+ * Why nothing the shopper asked for was suggested. Later in this list means the request got closer to
+ * being suggested, and the closest reason is the one worth telling the shopper.
+ */
+export type MissKind = "none" | "profile" | "protein" | "budget" | "gap" | "inCart" | "removed" | "covered" | "spent";
+export interface Miss {
+  kind: MissKind;
+  /** For "profile": the diet or allergy that rules the products out, e.g. "you avoid dairy". */
+  cause?: string;
+}
+const ORDER: MissKind[] = ["none", "profile", "protein", "budget", "gap", "inCart", "removed", "covered", "spent"];
+
+/** Whether `a` got further towards being suggested than `b`. */
+export const closer = (a: Miss, b: Miss) => ORDER.indexOf(a.kind) > ORDER.indexOf(b.kind);
+
+/** A plain explanation of why what the shopper asked for was not suggested. Empty when it was found. */
+export function preferenceMessage(preference: string, matches: number, miss: Miss): string {
   if (!preference || matches > 0) return "";
   const short = [...preference].length > 40 ? [...preference].slice(0, 40).join("") + "…" : preference;
-  return `Nothing matching "${short}" fits your goal, diet and budget, so these are the best alternatives.`;
+  switch (miss.kind) {
+    case "profile":
+      return `Coach left out "${short}" because your profile says ${miss.cause}. Use Edit in "What Coach understood" if that's not right.`;
+    case "protein":
+      return `"${short}" isn't a high-protein pick in the demo data, so Coach left it out.`;
+    case "budget":
+      return `"${short}" costs more than the budget you have left.`;
+    case "gap":
+      return `A pack of "${short}" has more protein than you still need, so Coach left it out.`;
+    case "inCart":
+      return `You already have "${short}" in your cart.`;
+    case "removed":
+      return `You removed the "${short}" Coach showed, so it won't suggest it again.`;
+    case "covered":
+      return `Your protein goal is already covered, so Coach has nothing to add, including "${short}".`;
+    case "spent":
+      return `Your cart already uses your whole budget, so Coach can't add "${short}".`;
+    default:
+      return `Coach couldn't find "${short}" in the store.`;
+  }
 }

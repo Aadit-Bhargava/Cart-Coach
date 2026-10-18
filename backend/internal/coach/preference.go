@@ -56,8 +56,34 @@ func PreferenceWords(s string) []string {
 	return out
 }
 
-// PreferenceMessage explains, in plain words, when nothing eligible matched the request.
-func PreferenceMessage(preference string, matches int) string {
+// MissKind is why nothing the shopper asked for could be suggested. A higher value means the request got
+// closer to being suggested, and the closest reason is the one worth telling the shopper.
+type MissKind int
+
+const (
+	MissNone    MissKind = iota // no product in the store matches the words
+	MissProfile                 // every match conflicts with the diet or an allergy
+	MissProtein                 // the matches are not high-protein picks in the data
+	MissBudget                  // the matches cost more than the budget left
+	MissGap                     // a pack has more protein than the shopper still needs
+	MissInCart                  // the shopper already has it
+	MissRemoved                 // the shopper removed it earlier
+	MissCovered                 // the protein goal is already met, so nothing is added at all
+	MissSpent                   // the budget is already used up, so nothing is added at all
+)
+
+// Miss is the reason a request was left out. Cause names the diet or allergy for MissProfile.
+type Miss struct {
+	Kind  MissKind
+	Cause string
+}
+
+// closer reports whether m got further towards being suggested than o.
+func (m Miss) closer(o Miss) bool { return m.Kind > o.Kind }
+
+// PreferenceMessage explains, in plain words, why what the shopper asked for was not suggested.
+// It is empty when nothing was asked or something matching was found.
+func PreferenceMessage(preference string, matches int, miss Miss) string {
 	if preference == "" || matches > 0 {
 		return ""
 	}
@@ -65,5 +91,23 @@ func PreferenceMessage(preference string, matches int) string {
 	if r := []rune(short); len(r) > 40 {
 		short = string(r[:40]) + "…"
 	}
-	return fmt.Sprintf("Nothing matching \"%s\" fits your goal, diet and budget, so these are the best alternatives.", short)
+	switch miss.Kind {
+	case MissProfile:
+		return fmt.Sprintf("Coach left out \"%s\" because your profile says %s. Use Edit in \"What Coach understood\" if that's not right.", short, miss.Cause)
+	case MissProtein:
+		return fmt.Sprintf("\"%s\" isn't a high-protein pick in the demo data, so Coach left it out.", short)
+	case MissBudget:
+		return fmt.Sprintf("\"%s\" costs more than the budget you have left.", short)
+	case MissGap:
+		return fmt.Sprintf("A pack of \"%s\" has more protein than you still need, so Coach left it out.", short)
+	case MissInCart:
+		return fmt.Sprintf("You already have \"%s\" in your cart.", short)
+	case MissRemoved:
+		return fmt.Sprintf("You removed the \"%s\" Coach showed, so it won't suggest it again.", short)
+	case MissCovered:
+		return fmt.Sprintf("Your protein goal is already covered, so Coach has nothing to add, including \"%s\".", short)
+	case MissSpent:
+		return fmt.Sprintf("Your cart already uses your whole budget, so Coach can't add \"%s\".", short)
+	}
+	return fmt.Sprintf("Coach couldn't find \"%s\" in the store.", short)
 }

@@ -44,6 +44,7 @@ type Plan struct {
 
 	Preference        string   // the shopper's request, if any
 	PreferenceMatches int      // eligible candidates that match it
+	PreferenceMiss    Miss     // when none match: the closest reason why
 	Rejected          []string // names of suggestions the shopper rejected, at most 10
 }
 
@@ -67,34 +68,39 @@ var allergenAliases = map[string]string{
 // Allowed reports whether a product fits the user's diet and allergies. When the
 // user has declared a diet, a product with unknown diet is not allowed.
 func Allowed(prof model.Profile, p model.Product) bool {
+	return blockedBy(prof, p) == ""
+}
+
+// blockedBy says, in plain words, which diet or allergy rules a product out. It is empty when the product is allowed.
+func blockedBy(prof model.Profile, p model.Product) string {
 	switch prof.Diet {
 	case "veg":
 		if p.Diet != "veg" {
-			return false
+			return "your diet is vegetarian"
 		}
 	case "eggetarian":
 		if p.Diet != "veg" && p.Diet != "egg" {
-			return false
+			return "your diet is eggetarian"
 		}
 	case "vegan":
 		if p.Diet != "veg" || slices.Contains(p.Allergens, "dairy") || slices.Contains(p.Allergens, "egg") || slices.Contains(p.Allergens, "honey") {
-			return false
+			return "your diet is vegan"
 		}
 	}
 	name := strings.ToLower(p.Name)
 	for _, a := range prof.Allergies {
 		if tag, ok := allergenAliases[a]; ok {
 			if slices.Contains(p.Allergens, tag) {
-				return false
+				return "you avoid " + a
 			}
 			continue
 		}
 		// An allergy we have no tag for: fall back to the product name.
 		if strings.Contains(name, a) {
-			return false
+			return "you avoid " + a
 		}
 	}
-	return true
+	return ""
 }
 
 // BuildPlan works out the protein gap and the eligible candidates for it.
@@ -124,18 +130,24 @@ func BuildPlan(all []model.Product, in Input) Plan {
 	}
 	plan.Gap = float64(in.Profile.ProteinTargetG) - plan.Have
 	plan.BudgetLeft = in.Profile.Budget - plan.Spent
-	if plan.Gap < minGap || plan.BudgetLeft <= 0 {
+	if plan.Gap < minGap {
+		plan.PreferenceMiss = Miss{Kind: MissCovered}
+		return plan
+	}
+	if plan.BudgetLeft <= 0 {
+		plan.PreferenceMiss = Miss{Kind: MissSpent}
 		return plan
 	}
 
 	for _, p := range all {
-		pp, ok := PackProtein(p)
-		if !ok || p.Price <= 0 || *p.ProteinG < 15 || pp < minGap || pp > plan.Gap || p.Price > plan.BudgetLeft {
+		asked := matchesWords(p, words)
+		if miss := missFor(p, in, plan, inCart); miss.Kind != MissNone {
+			if asked && miss.closer(plan.PreferenceMiss) {
+				plan.PreferenceMiss = miss
+			}
 			continue
 		}
-		if inCart[p.ID] || slices.Contains(in.Excluded, p.ID) || slices.Contains(skipCategories, p.CategoryName()) || !Allowed(in.Profile, p) {
-			continue
-		}
+		pp, _ := PackProtein(p)
 		c := Candidate{Product: p, PackProtein: pp, ProteinPerRupee: pp / p.Price}
 		c.score = c.ProteinPerRupee
 		for _, w := range in.Profile.Likes {
@@ -144,7 +156,7 @@ func BuildPlan(all []model.Product, in Input) Plan {
 				break
 			}
 		}
-		if matchesWords(p, words) {
+		if asked {
 			c.matched = true
 			plan.PreferenceMatches++
 		}
@@ -180,4 +192,26 @@ func matchesWords(p model.Product, words []string) bool {
 		}
 	}
 	return false
+}
+
+// missFor reports why a product cannot be suggested, or a zero Miss when it can.
+func missFor(p model.Product, in Input, plan Plan, inCart map[int64]bool) Miss {
+	pp, ok := PackProtein(p)
+	switch {
+	case blockedBy(in.Profile, p) != "":
+		return Miss{Kind: MissProfile, Cause: blockedBy(in.Profile, p)}
+	case slices.Contains(skipCategories, p.CategoryName()):
+		return Miss{Kind: MissProtein}
+	case !ok || p.Price <= 0 || *p.ProteinG < 15 || pp < minGap:
+		return Miss{Kind: MissProtein}
+	case p.Price > plan.BudgetLeft:
+		return Miss{Kind: MissBudget}
+	case pp > plan.Gap:
+		return Miss{Kind: MissGap}
+	case inCart[p.ID]:
+		return Miss{Kind: MissInCart}
+	case slices.Contains(in.Excluded, p.ID):
+		return Miss{Kind: MissRemoved}
+	}
+	return Miss{}
 }
