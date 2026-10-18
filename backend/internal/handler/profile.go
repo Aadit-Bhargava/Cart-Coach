@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"github.com/aaditbhargava/cart-coach/internal/auth"
 	"github.com/aaditbhargava/cart-coach/internal/coach"
 	"github.com/aaditbhargava/cart-coach/internal/model"
 	"github.com/aaditbhargava/cart-coach/internal/repository"
@@ -22,17 +23,18 @@ const supportMessage = "It sounds like things might be hard right now. Cart Coac
 
 type ProfileHandler struct {
 	users    *repository.UserRepository
+	sessions *auth.Sessions
 	profiles *repository.ProfileRepository
 	decide   *repository.DecisionRepository
 	gemini   *coach.Gemini
 }
 
-func NewProfileHandler(u *repository.UserRepository, p *repository.ProfileRepository, d *repository.DecisionRepository, g *coach.Gemini) *ProfileHandler {
-	return &ProfileHandler{users: u, profiles: p, decide: d, gemini: g}
+func NewProfileHandler(u *repository.UserRepository, s *auth.Sessions, p *repository.ProfileRepository, d *repository.DecisionRepository, g *coach.Gemini) *ProfileHandler {
+	return &ProfileHandler{users: u, sessions: s, profiles: p, decide: d, gemini: g}
 }
 
 func (h *ProfileHandler) Register(r *gin.Engine) {
-	auth := r.Group("/api", RequireUser(h.users))
+	auth := r.Group("/api", RequireUser(h.users, h.sessions))
 	auth.GET("/profile", h.Get)
 	auth.PUT("/profile", h.Put)
 	auth.POST("/profile/understand", RateLimit(15), h.Understand)
@@ -47,22 +49,22 @@ type understandRequest struct {
 func (h *ProfileHandler) Understand(c *gin.Context) {
 	var req understandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "text is required"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Write a few words about your goal."})
 		return
 	}
 	text := strings.TrimSpace(req.Text)
 	if n := utf8.RuneCountInString(text); n < 8 || n > 500 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "text must be 8 to 500 characters"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Describe your goal in 8 to 500 characters."})
 		return
 	}
 	u, err := h.gemini.Understand(c.Request.Context(), text)
 	if errors.Is(err, coach.ErrNotConfigured) {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Coach is not available right now"})
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Coach isn't available right now. Try again in a few minutes."})
 		return
 	}
 	if err != nil {
 		log.Printf("understand: %v", err)
-		c.JSON(http.StatusBadGateway, gin.H{"error": "Coach could not read that, try again"})
+		c.JSON(http.StatusBadGateway, gin.H{"error": "Coach couldn't read that right now. Try again in a moment."})
 		return
 	}
 	if u.NeedsSupport {
@@ -78,11 +80,11 @@ func (h *ProfileHandler) Understand(c *gin.Context) {
 func (h *ProfileHandler) Get(c *gin.Context) {
 	p, err := h.profiles.Get(c.Request.Context(), userID(c))
 	if errors.Is(err, repository.ErrProfileNotFound) {
-		c.JSON(http.StatusNotFound, gin.H{"error": "no profile yet"})
+		c.JSON(http.StatusNotFound, gin.H{"error": "You haven't set a goal yet."})
 		return
 	}
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load profile"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "We couldn't load your goal. Try again in a moment."})
 		return
 	}
 	c.JSON(http.StatusOK, p)
@@ -92,7 +94,7 @@ func (h *ProfileHandler) Get(c *gin.Context) {
 func (h *ProfileHandler) Put(c *gin.Context) {
 	var req model.SavedProfile
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid profile"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Some goal details are missing or invalid. Check them and try again."})
 		return
 	}
 	if err := req.Validate(); err != nil {
@@ -101,11 +103,11 @@ func (h *ProfileHandler) Put(c *gin.Context) {
 	}
 	req.GoalText = strings.TrimSpace(req.GoalText)
 	if n := utf8.RuneCountInString(req.GoalText); n < 8 || n > 500 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "goal_text must be 8 to 500 characters"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Describe your goal in 8 to 500 characters."})
 		return
 	}
 	if err := h.profiles.Save(c.Request.Context(), userID(c), req); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not save profile"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "We couldn't save your goal. Try again in a moment."})
 		return
 	}
 	c.JSON(http.StatusOK, req)

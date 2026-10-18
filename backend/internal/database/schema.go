@@ -18,6 +18,7 @@ create table if not exists users (
     name       text not null,
     created_at timestamptz not null default now()
 );
+alter table users add column if not exists password_hash text;
 
 create table if not exists products (
     id         bigserial primary key,

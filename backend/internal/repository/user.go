@@ -32,13 +32,13 @@ func NewUserRepository(pool *pgxpool.Pool) *UserRepository {
 	return &UserRepository{pool: pool}
 }
 
-// Create inserts a user and returns the stored row.
-func (r *UserRepository) Create(ctx context.Context, email, name string) (*User, error) {
+// CreateWithPassword inserts a user with a bcrypt password hash and returns the stored row.
+func (r *UserRepository) CreateWithPassword(ctx context.Context, email, name, passwordHash string) (*User, error) {
 	u := &User{}
 	err := r.pool.QueryRow(ctx,
-		`insert into users (email, name) values ($1, $2)
+		`insert into users (email, name, password_hash) values ($1, $2, $3)
 		 returning id, email, name, created_at`,
-		email, name,
+		email, name, passwordHash,
 	).Scan(&u.ID, &u.Email, &u.Name, &u.CreatedAt)
 
 	var pgErr *pgconn.PgError
@@ -49,6 +49,26 @@ func (r *UserRepository) Create(ctx context.Context, email, name string) (*User,
 		return nil, err
 	}
 	return u, nil
+}
+
+// GetCredentials returns the user and their password hash. The hash is empty for
+// accounts that have no password.
+func (r *UserRepository) GetCredentials(ctx context.Context, email string) (*User, string, error) {
+	u := &User{}
+	var hash *string
+	err := r.pool.QueryRow(ctx,
+		`select id, email, name, created_at, password_hash from users where email = $1`, email,
+	).Scan(&u.ID, &u.Email, &u.Name, &u.CreatedAt, &hash)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, "", ErrUserNotFound
+	}
+	if err != nil {
+		return nil, "", err
+	}
+	if hash == nil {
+		return u, "", nil
+	}
+	return u, *hash, nil
 }
 
 // GetByEmail returns the user with the given email.

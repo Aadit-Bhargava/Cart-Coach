@@ -51,11 +51,11 @@ func (s *Service) Suggest(ctx context.Context, userID int64, in Input) (*Suggest
 		}
 	}
 
-	source := "chosen by " + s.gemini.Model
+	source := "picked by Coach"
 	choices, err := s.gemini.Choose(ctx, in.Profile, cartNames, plan)
 	if err != nil {
 		log.Printf("coach: gemini choose failed, using fallback ranking: %v", err)
-		source = "Gemini was unavailable, so the rule-based ranking was used"
+		source = "Coach's AI was unavailable, so items were ranked by protein per rupee instead"
 		choices = nil
 	}
 	if choices != nil {
@@ -65,7 +65,7 @@ func (s *Service) Suggest(ctx context.Context, userID int64, in Input) (*Suggest
 		// The model picked nothing usable (or was unavailable): use the ranking.
 		res.Suggestions = Fallback(plan)
 		if choices != nil {
-			source = "the model's picks failed verification, so the rule-based ranking was used"
+			source = "Coach's first picks didn't pass our checks, so items were ranked by protein per rupee instead"
 		}
 	}
 
@@ -79,7 +79,7 @@ func (s *Service) Suggest(ctx context.Context, userID int64, in Input) (*Suggest
 	}
 	res.Log = model.Decision{
 		Title:  fmt.Sprintf("Coach suggests %d %s (+%s g protein, +₹%s)", len(res.Suggestions), plural(len(res.Suggestions)), trim(round1(protein)), trim(cost)),
-		Detail: strings.Join(lines, " | ") + ". Numbers come from the catalog (demo data); " + source + ".",
+		Detail: strings.Join(lines, " | ") + ". Numbers come from the product catalog (demo data); " + source + ".",
 	}
 	s.record(ctx, userID, res.Log)
 	return res, nil

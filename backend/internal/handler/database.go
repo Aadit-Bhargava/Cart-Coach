@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"time"
 
@@ -29,7 +30,8 @@ func (h *DatabaseHandler) Ping(c *gin.Context) {
 	defer cancel()
 
 	if err := h.pool.Ping(ctx); err != nil {
-		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy", "error": err.Error()})
+		log.Printf("database ping failed: %v", err)
+		c.JSON(http.StatusServiceUnavailable, gin.H{"status": "unhealthy"})
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"status": "ok"})

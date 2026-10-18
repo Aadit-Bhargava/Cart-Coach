@@ -22,7 +22,7 @@ func (h *ProductHandler) Register(r *gin.Engine) {
 func (h *ProductHandler) List(c *gin.Context) {
 	list, err := h.products.All(c.Request.Context())
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "could not load products"})
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "We couldn't load products. Try again in a moment."})
 		return
 	}
 	c.Header("Cache-Control", "public, max-age=60")

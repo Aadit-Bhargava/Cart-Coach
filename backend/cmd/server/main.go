@@ -3,6 +3,7 @@ package main
 import (
 	"go.uber.org/fx"
 
+	"github.com/aaditbhargava/cart-coach/internal/auth"
 	"github.com/aaditbhargava/cart-coach/internal/coach"
 	"github.com/aaditbhargava/cart-coach/internal/config"
 	"github.com/aaditbhargava/cart-coach/internal/database"
@@ -26,7 +27,8 @@ func main() {
 			handler.NewProfileHandler,
 			handler.NewCoachHandler,
 			handler.NewDatabaseHandler,
-			handler.NewUserHandler,
+			handler.NewAuthHandler,
+			auth.NewSessions,
 			server.NewEngine,
 		),
 		fx.Invoke(database.RunMigrations, server.Start),
