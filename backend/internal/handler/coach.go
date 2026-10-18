@@ -34,20 +34,16 @@ func (h *CoachHandler) Register(r *gin.Engine) {
 }
 
 type suggestRequest struct {
-	Profile            model.Profile    `json:"profile"`
 	Cart               []model.CartItem `json:"cart"`
 	ExcludedProductIDs []int64          `json:"excluded_product_ids"`
 }
 
-// Suggest returns up to three verified suggestions for the user's cart.
+// Suggest returns up to three verified suggestions for the user's cart. It uses
+// the profile saved on the server, not one sent by the browser.
 func (h *CoachHandler) Suggest(c *gin.Context) {
 	var req suggestRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "We couldn't read that request. Reload the page and try again."})
-		return
-	}
-	if err := req.Profile.Validate(); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	if len(req.Cart) > 100 || len(req.ExcludedProductIDs) > 500 {
@@ -60,22 +56,21 @@ func (h *CoachHandler) Suggest(c *gin.Context) {
 			return
 		}
 	}
-	if !req.Profile.AutoAdd {
-		c.JSON(http.StatusForbidden, gin.H{"error": "Suggestions are off. Turn on \"Let Coach pre-fill my cart\" in your goal to get them."})
-		return
-	}
 
-	res, err := h.coach.Suggest(c.Request.Context(), userID(c), coach.Input{Profile: req.Profile, Cart: req.Cart, Excluded: req.ExcludedProductIDs})
-	if errors.Is(err, coach.ErrNotConfigured) {
+	res, err := h.coach.Suggest(c.Request.Context(), userID(c), req.Cart, req.ExcludedProductIDs)
+	switch {
+	case errors.Is(err, coach.ErrDetailsMissing):
+		c.JSON(http.StatusConflict, gin.H{"error": "Add your age, weight and height so Coach can work out your protein target."})
+	case errors.Is(err, coach.ErrAutoAddOff):
+		c.JSON(http.StatusForbidden, gin.H{"error": "Suggestions are off. Turn on \"Let Coach pre-fill my cart\" in your goal to get them."})
+	case errors.Is(err, coach.ErrNotConfigured):
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "Coach isn't available right now. Try again in a few minutes."})
-		return
-	}
-	if err != nil {
+	case err != nil:
 		log.Printf("suggest: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Coach couldn't find suggestions right now. Try again in a moment."})
-		return
+	default:
+		c.JSON(http.StatusOK, res)
 	}
-	c.JSON(http.StatusOK, res)
 }
 
 func (h *CoachHandler) ListDecisions(c *gin.Context) {

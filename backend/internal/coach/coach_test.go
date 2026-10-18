@@ -165,3 +165,43 @@ func TestProfileValidate(t *testing.T) {
 		}
 	}
 }
+
+func TestBuildPlanCarriesPeriod(t *testing.T) {
+	plan := BuildPlan([]model.Product{prod(1, "Paneer 200 g", "Dairy", "veg", 100, 18, "dairy")}, Input{
+		Profile:       model.Profile{ProteinTargetG: 330, Diet: "veg", Budget: 600},
+		Days:          3,
+		DailyProteinG: 110,
+	})
+	if plan.PeriodDays != 3 || plan.DailyNeedG != 110 {
+		t.Errorf("plan period = %d days, %d g a day; want 3 and 110", plan.PeriodDays, plan.DailyNeedG)
+	}
+}
+
+func TestVerifyDropsBannedWhy(t *testing.T) {
+	a := prod(1, "Masala Peanuts 150 g", "Snacks", "veg", 57, 24.6)
+	plan := Plan{Gap: 50, BudgetLeft: 100, Candidates: []Candidate{{Product: a, PackProtein: 36.9, ProteinPerRupee: 0.65}}}
+
+	dropped := []string{
+		"Good for your age",
+		"Helps your weight goals",
+		"Light on the body",
+		"Fits a 72 kg frame",
+		"Might cure fatigue",
+		"Great for young athletes",
+		"Helps you lose fat",
+	}
+	for _, why := range dropped {
+		got := Verify([]Choice{{ProductID: 1, Why: why}}, plan)
+		if len(got) != 1 || got[0].Why != "" {
+			t.Errorf("why %q must be dropped but the pick kept, got %+v", why, got)
+		}
+	}
+
+	kept := []string{"Handy single-serve package", "Crunchy and filling", "Pairs well with the paneer you picked"}
+	for _, why := range kept {
+		got := Verify([]Choice{{ProductID: 1, Why: why}}, plan)
+		if len(got) != 1 || got[0].Why != why {
+			t.Errorf("why %q must be kept (whole-word matching), got %+v", why, got)
+		}
+	}
+}

@@ -22,6 +22,10 @@ type Input struct {
 	Profile  model.Profile
 	Cart     []model.CartItem // the user's own items only
 	Excluded []int64          // suggestions the user removed
+
+	// The period the cart covers and the daily protein need, from the saved profile.
+	Days          int
+	DailyProteinG int
 }
 
 type Plan struct {
@@ -30,6 +34,9 @@ type Plan struct {
 	Gap        float64 // grams still to reach the target
 	BudgetLeft float64
 	Candidates []Candidate // best first, at most maxCandidates
+
+	PeriodDays int // days the cart covers
+	DailyNeedG int // daily protein need, grams
 }
 
 const (
@@ -87,7 +94,7 @@ func BuildPlan(all []model.Product, in Input) Plan {
 	for _, p := range all {
 		byID[p.ID] = p
 	}
-	plan := Plan{}
+	plan := Plan{PeriodDays: in.Days, DailyNeedG: in.DailyProteinG}
 	inCart := map[int64]bool{}
 	for _, it := range in.Cart {
 		p, ok := byID[it.ProductID]

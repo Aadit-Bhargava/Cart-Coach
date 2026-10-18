@@ -2,6 +2,7 @@ package coach
 
 import (
 	"fmt"
+	"regexp"
 	"strings"
 	"unicode"
 
@@ -59,9 +60,13 @@ func Fallback(plan Plan) []model.Suggestion {
 	return Verify(choices, plan)
 }
 
+// bannedWhy lists words a "why" must not contain. It keeps the model from
+// mentioning the person's body, weight or age, or making health claims.
+var bannedWhy = regexp.MustCompile(`(?i)\b(weight|kg|kilo|bmi|age|aged|old|young|body|overweight|underweight|obese|skinny|thin|cure|treat|prevent|disease|lose|burn)\b`)
+
 func cleanWhy(s string) string {
 	s = strings.TrimSpace(s)
-	if s == "" || len(s) > 90 || strings.ContainsAny(s, "\n\r") {
+	if s == "" || len(s) > 90 || strings.ContainsAny(s, "\n\r") || bannedWhy.MatchString(s) {
 		return ""
 	}
 	for _, r := range s {
