@@ -1,4 +1,5 @@
-import { Button, LinkButton, Loading, ProductImage, cx } from "@/components/ui";
+import { useState } from "react";
+import { Button, LinkButton, Loading, ProductImage, cx, field } from "@/components/ui";
 import { DietMark } from "@/components/DietMark";
 import { Stepper } from "@/components/Stepper";
 import { grams, inr, plural } from "@/lib/format";
@@ -6,6 +7,7 @@ import { whatToDo } from "@/lib/errors";
 import { detailsComplete } from "@/lib/target";
 import { describeProfile } from "@/lib/profile";
 import type { ProductView } from "@/lib/product";
+import { MAX_PREFERENCE } from "@/lib/preference";
 import { useCartView, type CartLine } from "@/state/cart";
 import { useCoach } from "@/state/coach";
 import { useDispatch, useStore } from "@/state/store";
@@ -21,7 +23,7 @@ interface Props {
 }
 
 export function CartPanel({ byId, onGoal, onDetails, onLog, className }: Props) {
-  const { profile, note } = useStore();
+  const { profile, note, preference } = useStore();
   const dispatch = useDispatch();
   const toast = useToast();
   const cart = useCartView(byId);
@@ -85,6 +87,22 @@ export function CartPanel({ byId, onGoal, onDetails, onLog, className }: Props) 
           <div className="mt-3 rounded-2xl bg-coach-tint p-3.5">
             <b className="block text-coach">Coach updated its suggestions</b>
             {note}
+          </div>
+        )}
+
+        {preference && (
+          <div className="mt-3 flex items-center justify-between gap-3 rounded-2xl border border-coach/30 py-1.5 pl-3.5 pr-1.5 text-sm">
+            <span>
+              Coach is prioritising: <b>{preference}</b>
+            </span>
+            <button
+              type="button"
+              aria-label={`Stop prioritising ${preference}`}
+              onClick={() => dispatch({ type: "setPreference", preference: "" })}
+              className="grid size-11 shrink-0 place-items-center rounded-full hover:bg-ground"
+            >
+              ✕
+            </button>
           </div>
         )}
 
@@ -204,6 +222,8 @@ function UserLine({ product, line }: CartLine) {
 function CoachLine({ product }: CartLine) {
   const dispatch = useDispatch();
   const toast = useToast();
+  const [asking, setAsking] = useState(false);
+  const [wanted, setWanted] = useState("");
   return (
     <div className="my-2 grid grid-cols-[52px_1fr] gap-3 rounded-2xl border-l-4 border-coach bg-coach-tint p-3">
       <ProductImage product={product} className="size-[52px] rounded-xl !bg-white !text-coach" textClass="text-2xl" />
@@ -213,14 +233,16 @@ function CoachLine({ product }: CartLine) {
           <DietMark diet={product.diet} /> {product.name}
         </div>
         <div className="text-[13px] text-muted">
-          {product.packText}, {inr(product.price)} demo price
+          {product.packText}, {inr(product.price)} demo price{product.proteinPerRupee != null ? `, ${product.proteinPerRupee.toFixed(2)} g per ₹` : ""}
         </div>
         <div className="mt-0.5 text-sm font-semibold text-coach">
           +{grams(product.packProtein ?? 0)} g protein, {inr(product.price)} more
         </div>
       </div>
       <div className="col-span-2 flex items-center justify-between gap-2">
-        <span className="text-sm">{product.proteinPerRupee != null ? `${product.proteinPerRupee.toFixed(2)} g per ₹` : ""}</span>
+        <LinkButton onClick={() => setAsking((a) => !a)} aria-expanded={asking}>
+          Not this
+        </LinkButton>
         <div className="flex gap-2">
           <Button
             variant="ghost"
@@ -236,6 +258,36 @@ function CoachLine({ product }: CartLine) {
           </Button>
         </div>
       </div>
+      {asking && (
+        <form
+          className="col-span-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            dispatch({ type: "findAnother", id: product.id, name: product.name, preference: wanted });
+            toast("Looking for another pick");
+          }}
+        >
+          <label className="block text-sm font-semibold">
+            What would you like instead? (optional)
+            <input
+              className={field}
+              autoFocus
+              maxLength={MAX_PREFERENCE}
+              value={wanted}
+              onChange={(e) => setWanted(e.target.value)}
+              placeholder="For example: paneer"
+            />
+          </label>
+          <div className="mt-2 flex gap-2">
+            <Button type="submit" variant="coach">
+              Find another
+            </Button>
+            <Button variant="ghost" onClick={() => setAsking(false)}>
+              Cancel
+            </Button>
+          </div>
+        </form>
+      )}
     </div>
   );
 }

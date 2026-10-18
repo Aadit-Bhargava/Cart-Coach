@@ -2,6 +2,7 @@
 // picking and the Verifier). Used only by the demo API. Nothing here is medical
 // or dietary advice: it matches protein to a number the user can change.
 import type { Diet, Profile } from "@/api/types";
+import { matchesWords, preferenceWords } from "./preference";
 import type { Activity } from "./target";
 import { grams, inr } from "./format";
 import type { ProductView } from "./product";
@@ -63,9 +64,14 @@ export interface PickInput {
   profile: Profile;
   cart: { product: ProductView; quantity: number }[];
   excluded: number[];
+  /** What the shopper asked for when they rejected a suggestion. Empty when nothing was asked. */
+  preference: string;
 }
 
-export function pickSuggestions({ products, profile, cart, excluded }: PickInput): ProductView[] {
+export function pickSuggestions({ products, profile, cart, excluded, preference }: PickInput): { picks: ProductView[]; matches: number } {
+  const words = preferenceWords(preference);
+  const asked = (p: ProductView) => matchesWords(`${p.name} ${p.category}`, words);
+  let matches = 0;
   const inCart = new Set(cart.map((l) => l.product.id));
   let spent = cart.reduce((a, l) => a + l.product.price * l.quantity, 0);
   let have = cart.reduce((a, l) => a + (l.product.packProtein ?? 0) * l.quantity, 0);
@@ -74,7 +80,7 @@ export function pickSuggestions({ products, profile, cart, excluded }: PickInput
     const gap = profile.protein_target_g - have;
     if (gap < 4) break;
     const liked = (p: ProductView) => (profile.likes.some((w) => p.name.toLowerCase().includes(w)) ? 1.5 : 1);
-    const best = products
+    const eligible = products
       .filter(
         (p) =>
           p.packProtein != null &&
@@ -88,14 +94,16 @@ export function pickSuggestions({ products, profile, cart, excluded }: PickInput
           !picks.includes(p) &&
           isAllowed(p, profile) &&
           spent + p.price <= profile.budget,
-      )
-      .sort((a, b) => (b.proteinPerRupee ?? 0) * liked(b) - (a.proteinPerRupee ?? 0) * liked(a))[0];
+      );
+    if (i === 0) matches = eligible.filter(asked).length;
+    // Items the shopper asked for come first, then the usual order.
+    const best = [...eligible].sort((a, b) => Number(asked(b)) - Number(asked(a)) || (b.proteinPerRupee ?? 0) * liked(b) - (a.proteinPerRupee ?? 0) * liked(a))[0];
     if (!best || best.packProtein == null) break;
     picks.push(best);
     spent += best.price;
     have += best.packProtein;
   }
-  return picks;
+  return { picks, matches };
 }
 
 export const reasonFor = (p: ProductView) => `+${grams(p.packProtein ?? 0)} g protein, ${inr(p.price)} more`;

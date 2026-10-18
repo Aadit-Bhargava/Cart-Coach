@@ -3,6 +3,7 @@ import extraProducts from "@/demo/products.extra.json";
 import { grams, inr, plural } from "@/lib/format";
 import { pickSuggestions, reasonFor, sourceFor, understandText } from "@/lib/coach";
 import { toView, type ProductView } from "@/lib/product";
+import { preferenceMessage } from "@/lib/preference";
 import { dailyProtein, detailsComplete, resolveDaily } from "@/lib/target";
 import { ApiError } from "./http";
 import { profileSchema } from "./validate";
@@ -69,7 +70,7 @@ export const demoApi: CartCoachApi = {
     return { daily_protein_g: grams, basis };
   },
 
-  async suggestItems({ cart, excluded_product_ids }) {
+  async suggestItems({ cart, excluded_product_ids, preference }) {
     await delay(700);
     const profile = savedProfile();
     if (!profile || !detailsComplete(profile)) {
@@ -79,7 +80,8 @@ export const demoApi: CartCoachApi = {
       const product = byId.get(l.product_id);
       return product ? [{ product, quantity: l.quantity }] : [];
     });
-    const picks = pickSuggestions({ products: views, profile, cart: lines, excluded: excluded_product_ids ?? [] });
+    const asked = (preference ?? "").replace(/\s+/g, " ").trim();
+    const { picks, matches } = pickSuggestions({ products: views, profile, cart: lines, excluded: excluded_product_ids ?? [], preference: asked });
     const protein = picks.reduce((a, p) => a + (p.packProtein ?? 0), 0);
     const cost = picks.reduce((a, p) => a + p.price, 0);
     return {
@@ -95,6 +97,7 @@ export const demoApi: CartCoachApi = {
             detail: picks.map(sourceFor).join(" | "),
           }
         : { title: "No suggestions needed", detail: "Your goal is covered, or nothing fits your details and budget." },
+      message: picks.length ? preferenceMessage(asked, matches) || undefined : undefined,
     };
   },
 };

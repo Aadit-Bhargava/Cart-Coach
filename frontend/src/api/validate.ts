@@ -61,4 +61,5 @@ export const suggestResponseSchema = z.object({
     }),
   ),
   log: z.object({ title: z.string(), detail: z.string(), created_at: z.string().optional() }),
+  message: z.string().optional(),
 }) satisfies z.ZodType<SuggestResponse>;

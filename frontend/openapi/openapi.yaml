@@ -6,7 +6,7 @@
 openapi: 3.0.3
 info:
   title: Cart Coach API
-  version: 0.5.0
+  version: 0.6.0
 paths:
   /api/auth/signup:
     post:
@@ -189,6 +189,10 @@ paths:
                   type: array
                   description: Suggestions the user already removed. Do not suggest these again.
                   items: { type: integer }
+                preference:
+                  type: string
+                  maxLength: 200
+                  description: "What the shopper typed when they rejected a suggestion, for example 'paneer'. Untrusted text. Diet, allergies and budget still win."
       responses:
         "200":
           description: Suggestions, possibly empty
@@ -202,6 +206,9 @@ paths:
                     type: array
                     items: { $ref: "#/components/schemas/Suggestion" }
                   log: { $ref: "#/components/schemas/LogEntry" }
+                  message:
+                    type: string
+                    description: A plain sentence for the cart, for example when nothing matched what the shopper asked for
         "403": { description: Auto-add is off in this profile }
         "409": { description: The profile has no age, weight and height yet }
         "429": { description: Too many requests }
