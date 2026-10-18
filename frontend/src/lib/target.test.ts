@@ -60,3 +60,18 @@ test("detailsComplete is false for a legacy profile and true for a full one", ()
   assert.equal(detailsComplete({ ...full, days: 0 }), false);
   assert.equal(detailsComplete({ ...full, daily_protein_g: 0 }), false);
 });
+
+test("readStats turns the three form fields into numbers or one plain message", async () => {
+  const { readStats } = await import("./target.ts");
+  assert.deepEqual(readStats("30", "72,5", "175"), { ok: true, stats: { age_years: 30, weight_kg: 72.5, height_cm: 175 } });
+  assert.deepEqual(readStats(" 18 ", "30", "120"), { ok: true, stats: { age_years: 18, weight_kg: 30, height_cm: 120 } });
+
+  const ageMsg = "Enter your age (18 to 100).";
+  const weightMsg = "Enter your weight in kg (30 to 250).";
+  const heightMsg = "Enter your height in cm (120 to 230).";
+  for (const age of ["", "abc", "17", "101", "30.5", "-30", "1e2"]) assert.deepEqual(readStats(age, "72", "175"), { ok: false, error: ageMsg }, `age ${age}`);
+  for (const w of ["", "abc", "29.9", "250.1", "Infinity", "0"]) assert.deepEqual(readStats("30", w, "175"), { ok: false, error: weightMsg }, `weight ${w}`);
+  for (const h of ["", "abc", "119.9", "230.1", "1e999"]) assert.deepEqual(readStats("30", "72", h), { ok: false, error: heightMsg }, `height ${h}`);
+  // The first problem wins, in the order age, weight, height.
+  assert.deepEqual(readStats("5", "5", "5"), { ok: false, error: ageMsg });
+});

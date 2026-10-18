@@ -11,16 +11,17 @@ import { Session } from "@/features/Session";
 import { useAuth } from "@/state/auth";
 import { CartPanel } from "@/features/CartPanel";
 import { CategoryNav } from "@/features/CategoryNav";
-import { GoalContent } from "@/features/GoalDialog";
+import { GoalContent, type GoalMode } from "@/features/GoalDialog";
 import { SignInContent } from "@/features/SignIn";
 import { LogContent } from "@/features/LogDialog";
 import { ProductCard } from "@/features/ProductCard";
 import { ProductDetail } from "@/features/ProductDetail";
 import { TopBar } from "@/features/TopBar";
 import { whatToDo } from "@/lib/errors";
+import { detailsComplete } from "@/lib/target";
 import { inr, plural } from "@/lib/format";
 
-type Overlay = { kind: "product"; id: number } | { kind: "goal"; first: boolean } | { kind: "log" } | { kind: "signin" } | null;
+type Overlay = { kind: "product"; id: number } | { kind: "goal"; first: boolean; mode: GoalMode } | { kind: "log" } | { kind: "signin" } | null;
 type Sort = "featured" | "low" | "high" | "az";
 const PAGE = 60;
 
@@ -48,6 +49,7 @@ function Shop() {
 
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [firstRunSeen, setFirstRunSeen] = useState(false);
+  const [detailsSkipped, setDetailsSkipped] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
@@ -57,11 +59,19 @@ function Shop() {
   // Not signed in: the sign-in popup sits over the homepage and cannot be dismissed.
   // Then the goal popup greets a new user once; it stays up until they save or skip.
   const needsSignIn = auth.status === "signedOut" || auth.status === "error";
+  // An account saved before age, weight and height were asked is asked once for them.
+  const needsDetails = auth.ready && Boolean(profile) && !detailsComplete(profile!) && !detailsSkipped;
   const activeOverlay: Overlay = needsSignIn
     ? { kind: "signin" }
-    : (overlay ?? (!firstRunSeen && !profile && auth.ready && status === "success" ? { kind: "goal", first: true } : null));
+    : (overlay ??
+      (needsDetails
+        ? { kind: "goal", first: false, mode: "details" }
+        : !firstRunSeen && !profile && auth.ready && status === "success"
+          ? { kind: "goal", first: true, mode: "full" }
+          : null));
   const closeOverlay = () => {
     setFirstRunSeen(true);
+    setDetailsSkipped(true);
     setOverlay(null);
   };
 
@@ -81,7 +91,7 @@ function Shop() {
   }, [products, category, query, sort]);
 
   const product = activeOverlay?.kind === "product" ? byId.get(activeOverlay.id) : undefined;
-  const openGoal = () => setOverlay({ kind: "goal", first: false });
+  const openGoal = () => setOverlay({ kind: "goal", first: false, mode: "full" });
   const openLog = () => setOverlay({ kind: "log" });
   const resetPage = () => setShown(PAGE);
 
@@ -213,6 +223,7 @@ function Shop() {
         {activeOverlay?.kind === "goal" && (
           <GoalContent
             first={activeOverlay.first}
+            mode={activeOverlay.mode}
             onDone={(saved) => {
               if (!saved) toast("You can set a goal any time from the top bar.");
               closeOverlay();

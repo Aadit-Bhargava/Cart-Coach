@@ -69,3 +69,18 @@ export function detailsComplete(p: {
 }): boolean {
   return p.age_years != null && p.weight_kg != null && p.height_cm != null && !!p.activity && (p.days ?? 0) > 0 && (p.daily_protein_g ?? 0) > 0;
 }
+
+export type StatsResult =
+  | { ok: true; stats: { age_years: number; weight_kg: number; height_cm: number } }
+  | { ok: false; error: string };
+
+/** Reads the three form fields. The first problem wins, in the order age, weight, height. */
+export function readStats(ageText: string, weightText: string, heightText: string): StatsResult {
+  const age = parseDecimal(ageText);
+  if (age === null || !Number.isInteger(age) || age < 18 || age > 100) return { ok: false, error: "Enter your age (18 to 100)." };
+  const weight = parseDecimal(weightText);
+  if (weight === null || weight < 30 || weight > 250) return { ok: false, error: "Enter your weight in kg (30 to 250)." };
+  const height = parseDecimal(heightText);
+  if (height === null || height < 120 || height > 230) return { ok: false, error: "Enter your height in cm (120 to 230)." };
+  return { ok: true, stats: { age_years: age, weight_kg: weight, height_cm: height } };
+}
