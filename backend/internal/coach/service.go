@@ -33,11 +33,13 @@ var ErrAutoAddOff = errors.New("auto-add is off")
 type SuggestResult struct {
 	Suggestions []model.Suggestion `json:"suggestions"`
 	Log         model.Decision     `json:"log"`
+	// Message is shown in the cart, e.g. when nothing matched what the shopper asked for.
+	Message string `json:"message,omitempty"`
 }
 
 // Suggest plans, asks Gemini to choose, verifies the choice and logs it. If
 // Gemini is unavailable it falls back to the plain ranking and says so in the log.
-func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartItem, excluded []int64) (*SuggestResult, error) {
+func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartItem, excluded []int64, preference string) (*SuggestResult, error) {
 	saved, err := s.profiles.Get(ctx, userID)
 	if errors.Is(err, repository.ErrProfileNotFound) || (err == nil && !saved.DetailsComplete) {
 		return nil, ErrDetailsMissing
@@ -48,7 +50,7 @@ func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartIt
 	if !saved.AutoAdd {
 		return nil, ErrAutoAddOff
 	}
-	in := Input{Profile: saved.Profile, Cart: cart, Excluded: excluded, Days: saved.Days, DailyProteinG: saved.DailyProteinG}
+	in := Input{Profile: saved.Profile, Cart: cart, Excluded: excluded, Days: saved.Days, DailyProteinG: saved.DailyProteinG, Preference: CleanPreference(preference)}
 
 	all, err := s.products.All(ctx)
 	if err != nil {
@@ -105,8 +107,9 @@ func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartIt
 	}
 	res.Log = model.Decision{
 		Title:  fmt.Sprintf("Coach suggests %d %s (+%s g protein, +₹%s)", len(res.Suggestions), plural(len(res.Suggestions)), trim(round1(protein)), trim(cost)),
-		Detail: strings.Join(lines, " | ") + ". Numbers come from the product catalog (demo data); " + source + ".",
+		Detail: strings.Join(lines, " | ") + ". Numbers come from the product catalog (demo data); " + source + "." + askedFor(in.Preference),
 	}
+	res.Message = PreferenceMessage(plan.Preference, plan.PreferenceMatches)
 	s.record(ctx, userID, res.Log)
 	return res, nil
 }
@@ -133,4 +136,12 @@ func (s *Service) record(ctx context.Context, userID int64, d model.Decision) {
 	if err := s.decisions.Add(ctx, userID, d); err != nil {
 		log.Printf("coach: could not save decision log entry: %v", err)
 	}
+}
+
+// askedFor adds the shopper's own request to the decision log entry.
+func askedFor(preference string) string {
+	if preference == "" {
+		return ""
+	}
+	return " You asked for: " + preference + "."
 }

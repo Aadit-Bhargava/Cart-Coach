@@ -16,6 +16,7 @@ type Candidate struct {
 	PackProtein     float64
 	ProteinPerRupee float64
 	score           float64
+	matched         bool // the name or category matches a word the shopper asked for
 }
 
 type Input struct {
@@ -26,6 +27,9 @@ type Input struct {
 	// The period the cart covers and the daily protein need, from the saved profile.
 	Days          int
 	DailyProteinG int
+
+	// What the shopper just asked for, already cleaned, e.g. "paneer". Empty when nothing was asked.
+	Preference string
 }
 
 type Plan struct {
@@ -37,11 +41,16 @@ type Plan struct {
 
 	PeriodDays int // days the cart covers
 	DailyNeedG int // daily protein need, grams
+
+	Preference        string   // the shopper's request, if any
+	PreferenceMatches int      // eligible candidates that match it
+	Rejected          []string // names of suggestions the shopper rejected, at most 10
 }
 
 const (
-	maxCandidates = 25
-	minGap        = 4.0 // below this the goal is close enough
+	maxCandidates               = 25
+	maxCandidatesWithPreference = 60  // wider, so the model can see what the shopper asked for
+	minGap                      = 4.0 // below this the goal is close enough
 )
 
 var allergenAliases = map[string]string{
@@ -94,7 +103,13 @@ func BuildPlan(all []model.Product, in Input) Plan {
 	for _, p := range all {
 		byID[p.ID] = p
 	}
-	plan := Plan{PeriodDays: in.Days, DailyNeedG: in.DailyProteinG}
+	plan := Plan{PeriodDays: in.Days, DailyNeedG: in.DailyProteinG, Preference: in.Preference}
+	for _, id := range in.Excluded {
+		if p, ok := byID[id]; ok && len(plan.Rejected) < 10 {
+			plan.Rejected = append(plan.Rejected, p.Name)
+		}
+	}
+	words := PreferenceWords(in.Preference)
 	inCart := map[int64]bool{}
 	for _, it := range in.Cart {
 		p, ok := byID[it.ProductID]
@@ -129,11 +144,40 @@ func BuildPlan(all []model.Product, in Input) Plan {
 				break
 			}
 		}
+		if matchesWords(p, words) {
+			c.matched = true
+			plan.PreferenceMatches++
+		}
 		plan.Candidates = append(plan.Candidates, c)
 	}
-	sort.SliceStable(plan.Candidates, func(i, j int) bool { return plan.Candidates[i].score > plan.Candidates[j].score })
-	if len(plan.Candidates) > maxCandidates {
-		plan.Candidates = plan.Candidates[:maxCandidates]
+	// Items the shopper asked for come first, then the usual order.
+	sort.SliceStable(plan.Candidates, func(i, j int) bool {
+		a, b := plan.Candidates[i], plan.Candidates[j]
+		if a.matched != b.matched {
+			return a.matched
+		}
+		return a.score > b.score
+	})
+	limit := maxCandidates
+	if len(words) > 0 {
+		limit = maxCandidatesWithPreference
+	}
+	if len(plan.Candidates) > limit {
+		plan.Candidates = plan.Candidates[:limit]
 	}
 	return plan
+}
+
+// matchesWords reports whether any word appears in the product's name or category.
+func matchesWords(p model.Product, words []string) bool {
+	if len(words) == 0 {
+		return false
+	}
+	text := strings.ToLower(p.Name + " " + p.CategoryName())
+	for _, w := range words {
+		if strings.Contains(text, w) {
+			return true
+		}
+	}
+	return false
 }

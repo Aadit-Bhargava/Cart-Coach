@@ -36,6 +36,8 @@ func (h *CoachHandler) Register(r *gin.Engine) {
 type suggestRequest struct {
 	Cart               []model.CartItem `json:"cart"`
 	ExcludedProductIDs []int64          `json:"excluded_product_ids"`
+	// What the shopper typed when they rejected a suggestion. Optional, at most 200 characters.
+	Preference string `json:"preference"`
 }
 
 // Suggest returns up to three verified suggestions for the user's cart. It uses
@@ -50,6 +52,10 @@ func (h *CoachHandler) Suggest(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Your cart is too large for Coach to review. Remove a few items and try again."})
 		return
 	}
+	if utf8.RuneCountInString(req.Preference) > coach.MaxPreferenceRunes {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Keep your request under 200 characters."})
+		return
+	}
 	for _, it := range req.Cart {
 		if it.Quantity < 1 || it.Quantity > 50 {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "Each item can be added up to 50 times."})
@@ -57,7 +63,7 @@ func (h *CoachHandler) Suggest(c *gin.Context) {
 		}
 	}
 
-	res, err := h.coach.Suggest(c.Request.Context(), userID(c), req.Cart, req.ExcludedProductIDs)
+	res, err := h.coach.Suggest(c.Request.Context(), userID(c), req.Cart, req.ExcludedProductIDs, req.Preference)
 	switch {
 	case errors.Is(err, coach.ErrDetailsMissing):
 		c.JSON(http.StatusConflict, gin.H{"error": "Add your age, weight and height so Coach can work out your protein target."})
