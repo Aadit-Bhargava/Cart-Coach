@@ -1,5 +1,7 @@
 import { Button, ProductImage } from "@/components/ui";
+import { DietMark } from "@/components/DietMark";
 import { Stepper } from "@/components/Stepper";
+import { allergenLabels, isVegan } from "@/lib/diet";
 import { grams, inr } from "@/lib/format";
 import type { ProductView } from "@/lib/product";
 import { useDispatch, useStore } from "@/state/store";
@@ -7,14 +9,23 @@ import { useDispatch, useStore } from "@/state/store";
 export function ProductDetail({ product }: { product: ProductView }) {
   const line = useStore().lines[product.id];
   const dispatch = useDispatch();
+  const allergens = allergenLabels(product.allergens);
   const kcalPack = product.packG != null && product.calories != null ? (product.calories * product.packG) / 100 : null;
   return (
     <div className="p-7 pt-6">
-      <h2 className="pr-12 font-display text-[1.7rem] font-extrabold leading-[1.1] tracking-tight">{product.title}</h2>
+      <h2 className="pr-12 font-display text-[1.7rem] font-extrabold leading-[1.1] tracking-tight"><DietMark diet={product.diet} /> {product.title}
+      </h2>
       <p className="mt-1.5 text-muted">
         {product.brand}
         {product.packText ? `, ${product.packText}` : ""}
       </p>
+      {(isVegan(product) || allergens.length > 0) && (
+        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
+          {isVegan(product) && <span className="rounded-full bg-[#e6f4ea] px-2.5 py-0.5 font-semibold text-[#14632b]">Vegan</span>}
+          {allergens.length > 0 && <span>Contains: {allergens.join(", ")}</span>}
+        </div>
+      )}
+      <p className="mt-1.5 text-xs text-muted">Tags are based on the product name and category in our demo data. Check the pack for allergens.</p>
       <ProductImage product={product} className="mt-4 h-[150px] rounded-[18px]" textClass="text-8xl" />
 
       <div className="mt-4 flex items-center justify-between gap-4">

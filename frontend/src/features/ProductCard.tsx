@@ -1,4 +1,5 @@
 import { Button, ProductImage } from "@/components/ui";
+import { DietMark } from "@/components/DietMark";
 import { Stepper } from "@/components/Stepper";
 import { inr } from "@/lib/format";
 import type { ProductView } from "@/lib/product";
@@ -14,7 +15,9 @@ export function ProductCard({ product, onOpen }: { product: ProductView; onOpen:
         <ProductImage product={product} className="aspect-[1/0.82] w-full rounded-2xl" />
         <div className="px-1.5 pt-3">
           <div className="text-[13px] text-muted">{product.brand}</div>
-          <div className="line-clamp-2 min-h-[2.6em] font-semibold leading-[1.3]">{product.title}</div>
+          <div className="line-clamp-2 min-h-[2.6em] font-semibold leading-[1.3]">
+            <DietMark diet={product.diet} /> {product.title}
+          </div>
           <div className="mt-0.5 text-sm text-muted">{product.packText}</div>
         </div>
       </button>
