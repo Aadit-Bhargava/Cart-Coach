@@ -586,6 +586,8 @@ export interface operations {
                     }[];
                     /** @description Suggestions the user already removed. Do not suggest these again. */
                     excluded_product_ids?: number[];
+                    /** @description What the shopper typed when they rejected a suggestion, for example 'paneer'. Untrusted text. Diet, allergies and budget still win. */
+                    preference?: string;
                 };
             };
         };
@@ -599,6 +601,8 @@ export interface operations {
                     "application/json": {
                         suggestions: components["schemas"]["Suggestion"][];
                         log: components["schemas"]["LogEntry"];
+                        /** @description A plain sentence for the cart, for example when nothing matched what the shopper asked for */
+                        message?: string;
                     };
                 };
             };

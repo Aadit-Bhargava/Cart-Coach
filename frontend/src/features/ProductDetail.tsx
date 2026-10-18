@@ -13,7 +13,9 @@ export function ProductDetail({ product }: { product: ProductView }) {
   const kcalPack = product.packG != null && product.calories != null ? (product.calories * product.packG) / 100 : null;
   return (
     <div className="p-7 pt-6">
-      <h2 className="pr-12 font-display text-[1.7rem] font-extrabold leading-[1.1] tracking-tight"><DietMark diet={product.diet} /> {product.title}
+      <h2 className="flex items-start gap-2 pr-12 font-display text-[1.7rem] font-extrabold leading-[1.1] tracking-tight">
+        <DietMark diet={product.diet} className="mt-1.5" />
+        <span>{product.title}</span>
       </h2>
       <p className="mt-1.5 text-muted">
         {product.brand}

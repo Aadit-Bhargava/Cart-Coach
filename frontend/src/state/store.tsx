@@ -22,6 +22,10 @@ export interface State {
   note: string;
   /** Suggestions the user removed. Coach does not suggest them again. */
   dismissed: number[];
+  /** What the shopper asked for when they rejected a suggestion. Sent with every Coach request until cleared. */
+  preference: string;
+  /** Goes up when the shopper asks for another pick, so Coach asks again even if nothing else changed. */
+  refresh: number;
 }
 
 export type Action =
@@ -29,6 +33,8 @@ export type Action =
   | { type: "step"; id: number; delta: 1 | -1 }
   | { type: "keep"; id: number; name: string }
   | { type: "dismiss"; id: number; name: string }
+  | { type: "findAnother"; id: number; name: string; preference: string }
+  | { type: "setPreference"; preference: string }
   | { type: "loaded"; profile: SavedProfile | null; log: LogEntry[] }
   | { type: "undoAll" }
   | { type: "clearSuggestions" }
@@ -53,7 +59,7 @@ function load(): Pick<State, "profile" | "goalText"> {
   }
 }
 
-const init = (): State => ({ lines: {}, log: [], note: "", dismissed: [], ...load() });
+const init = (): State => ({ lines: {}, log: [], note: "", dismissed: [], preference: "", refresh: 0, ...load() });
 
 function reducer(s: State, a: Action): State {
   switch (a.type) {
@@ -94,6 +100,21 @@ function reducer(s: State, a: Action): State {
         log: [{ title: "You removed a suggestion", detail: a.name, client: true }, ...s.log],
       };
     }
+    case "findAnother": {
+      const lines = { ...s.lines };
+      delete lines[a.id];
+      const asked = a.preference.replace(/\s+/g, " ").trim().slice(0, 200);
+      return {
+        ...s,
+        lines,
+        dismissed: [...s.dismissed, a.id],
+        preference: asked || s.preference,
+        refresh: s.refresh + 1,
+        log: [{ title: "You asked Coach for something else", detail: asked ? `${a.name}. You asked for: ${asked}` : a.name, client: true }, ...s.log],
+      };
+    }
+    case "setPreference":
+      return { ...s, preference: a.preference };
     case "undoAll": {
       const ids = Object.entries(s.lines).filter(([, l]) => l.by === "coach").map(([id]) => Number(id));
       const lines = { ...s.lines };
@@ -106,7 +127,7 @@ function reducer(s: State, a: Action): State {
       };
     }
     case "clearSuggestions":
-      return { ...s, note: "", lines: Object.fromEntries(Object.entries(s.lines).filter(([, l]) => l.by === "user")) };
+      return { ...s, note: "", preference: "", lines: Object.fromEntries(Object.entries(s.lines).filter(([, l]) => l.by === "user")) };
     case "saveProfile":
       return {
         ...s,

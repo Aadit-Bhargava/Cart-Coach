@@ -21,7 +21,7 @@ export const useCoach = () => useContext(CoachContext);
  * user's items only, never its own earlier suggestions.
  */
 export function CoachProvider({ children }: { children: ReactNode }) {
-  const { lines, profile, dismissed } = useStore();
+  const { lines, profile, dismissed, preference, refresh } = useStore();
   const dispatch = useDispatch();
   const { byId } = useCatalog();
 
@@ -39,7 +39,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
   const mutation = useMutation({
     mutationFn: (req: { profileChanged: boolean }) => {
       if (!profile) throw new Error("No profile");
-      return api.suggestItems({ cart: userItems, excluded_product_ids: dismissed }).then((res) => ({ res, ...req }));
+      return api.suggestItems({ cart: userItems, excluded_product_ids: dismissed, ...(preference ? { preference } : {}) }).then((res) => ({ res, ...req }));
     },
   });
   const { mutate, reset } = mutation;
@@ -60,7 +60,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
                     .map((id) => byId.get(id)?.name ?? "an item")
                     .join(", ")}.`
                 : "";
-            dispatch({ type: "suggested", suggestions: res.suggestions, log: res.log, note });
+            dispatch({ type: "suggested", suggestions: res.suggestions, log: res.log, note: res.message || note });
           },
         },
       );
@@ -79,9 +79,10 @@ export function CoachProvider({ children }: { children: ReactNode }) {
     prevProfile.current = profileKey;
     const t = setTimeout(() => run(profileChanged), 500);
     return () => clearTimeout(t);
-    // run() reads the latest cart and profile, so only their signatures retrigger it.
+    // run() reads the latest cart and profile, so only their signatures, the shopper's request and
+    // the "find another" counter retrigger it.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature, profileKey]);
+  }, [signature, profileKey, preference, refresh]);
 
   const status: CoachStatus["status"] = mutation.isPending ? "loading" : mutation.isError ? "error" : "idle";
   return <CoachContext.Provider value={{ status, error: mutation.error, retry: () => run(false) }}>{children}</CoachContext.Provider>;

@@ -54,8 +54,7 @@ export function SignInContent() {
   return (
     <form onSubmit={onSubmit} noValidate className="p-8">
       <div className="font-display text-2xl font-extrabold tracking-tight">
-        Nukkad
-        <small className="-mt-0.5 block font-sans text-xs font-medium tracking-normal text-muted">with Cart Coach</small>
+        Cart Coach
       </div>
       <h2 className="mt-6 font-display text-[1.7rem] font-extrabold leading-[1.1] tracking-tight">{heading}</h2>
       <p className="mt-1.5 max-w-[42ch] text-muted">{intro}</p>

@@ -18,6 +18,7 @@ import (
 	"github.com/joho/godotenv"
 
 	"github.com/aaditbhargava/cart-coach/internal/config"
+	"github.com/aaditbhargava/cart-coach/internal/model"
 )
 
 func liveGemini(t *testing.T) *Gemini {
@@ -105,5 +106,39 @@ func TestUnderstandPromptLive(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+// A shopper who rejects rajma and asks for paneer must get paneer, not rajma.
+func TestChoosePreferenceLive(t *testing.T) {
+	g := liveGemini(t)
+	rajma := prod(1, "Kisan Fresh Rajma 1 kg", "Staples", "veg", 118, 22)
+	paneer := prod(2, "Sunrise Foods Paneer 200 g", "Dairy", "veg", 172, 18, "dairy")
+	oats := prod(3, "Masala Mandir Rolled Oats 1 kg", "Breakfast", "veg", 208, 12)
+	plan := Plan{
+		Gap: 250, BudgetLeft: 600, PeriodDays: 3, DailyNeedG: 110,
+		Preference: "I didn't want rajma, I wanted paneer instead",
+		Rejected:   []string{"Kisan Fresh Rajma 1 kg"},
+		Candidates: []Candidate{
+			{Product: rajma, PackProtein: 242, ProteinPerRupee: 2.05},
+			{Product: oats, PackProtein: 120, ProteinPerRupee: 0.58},
+			{Product: paneer, PackProtein: 36, ProteinPerRupee: 0.21, matched: true},
+		},
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 40*time.Second)
+	defer cancel()
+	picks, err := g.Choose(ctx, model.Profile{Diet: "veg", Likes: []string{"paneer"}}, []string{"Annapurna Farms Paneer 200 g"}, plan)
+	if err != nil {
+		t.Fatalf("Choose: %v", err)
+	}
+	var ids []int64
+	for _, p := range picks {
+		ids = append(ids, p.ProductID)
+	}
+	if !slices.Contains(ids, 2) {
+		t.Errorf("paneer (2) should be picked, got %v", ids)
+	}
+	if slices.Contains(ids, 1) {
+		t.Errorf("rajma (1) was rejected and must not be picked, got %v", ids)
 	}
 }
