@@ -14,11 +14,21 @@ import (
 )
 
 // NewEngine builds the gin engine and registers all routes.
-func NewEngine(db *handler.DatabaseHandler, users *handler.UserHandler) *gin.Engine {
+func NewEngine(
+	db *handler.DatabaseHandler,
+	users *handler.UserHandler,
+	products *handler.ProductHandler,
+	profile *handler.ProfileHandler,
+	coach *handler.CoachHandler,
+) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
+	r.Static("/static", "./static")
 	db.Register(r)
 	users.Register(r)
+	products.Register(r)
+	profile.Register(r)
+	coach.Register(r)
 	return r
 }
 

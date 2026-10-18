@@ -20,8 +20,8 @@ func NewUserHandler(users *repository.UserRepository) *UserHandler {
 
 // Register mounts the handler's routes on the engine.
 func (h *UserHandler) Register(r *gin.Engine) {
-	r.POST("/users", h.Create)
-	r.GET("/users", h.GetByEmail)
+	r.POST("/api/users", h.Create)
+	r.GET("/api/users", h.GetByEmail)
 }
 
 type createUserRequest struct {

@@ -3,3 +3,14 @@ bin/
 .claude/
 __debug_bin*
 .vscode/launch.json
+
+# Open Food Facts data (ODbL / CC BY-SA): keep out of the repo
+/products/
+/images/
+/fields-report.txt
+.fetch-state.json
+*.parquet
+*.csv
+*.csv.gz
+*.jsonl
+*.jsonl.gz
