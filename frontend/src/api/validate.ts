@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { Profile, SuggestResponse, UnderstandResponse, Understanding } from "./types";
+import type { Profile, SavedProfile, SuggestResponse, UnderstandResponse, Understanding, User } from "./types";
 
 export const dietSchema = z.enum(["veg", "vegan", "eggetarian", "non-veg", "unknown"]);
 
@@ -14,6 +14,14 @@ export const profileSchema = understandingSchema.extend({
   budget: z.number().min(50),
   auto_add: z.boolean(),
 }) satisfies z.ZodType<Profile>;
+
+export const savedProfileSchema = profileSchema.extend({ goal_text: z.string() }) satisfies z.ZodType<SavedProfile>;
+
+export const userSchema = z.object({ id: z.number().int(), email: z.string(), name: z.string() }) satisfies z.ZodType<User>;
+
+export const logEntriesSchema = z.object({
+  decisions: z.array(z.object({ title: z.string(), detail: z.string(), created_at: z.string().optional() })),
+});
 
 export const understandResponseSchema = z.object({
   understanding: understandingSchema.optional(),

@@ -7,10 +7,11 @@ import { useDispatch, useStore } from "./store";
 
 interface CoachStatus {
   status: "idle" | "loading" | "error";
+  error: unknown;
   retry: () => void;
 }
 
-const CoachContext = createContext<CoachStatus>({ status: "idle", retry: () => undefined });
+const CoachContext = createContext<CoachStatus>({ status: "idle", error: null, retry: () => undefined });
 export const useCoach = () => useContext(CoachContext);
 
 /**
@@ -82,5 +83,5 @@ export function CoachProvider({ children }: { children: ReactNode }) {
   }, [signature, profileKey]);
 
   const status: CoachStatus["status"] = mutation.isPending ? "loading" : mutation.isError ? "error" : "idle";
-  return <CoachContext.Provider value={{ status, retry: () => run(false) }}>{children}</CoachContext.Provider>;
+  return <CoachContext.Provider value={{ status, error: mutation.error, retry: () => run(false) }}>{children}</CoachContext.Provider>;
 }

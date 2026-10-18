@@ -16,7 +16,7 @@ import (
 // NewEngine builds the gin engine and registers all routes.
 func NewEngine(
 	db *handler.DatabaseHandler,
-	users *handler.UserHandler,
+	authH *handler.AuthHandler,
 	products *handler.ProductHandler,
 	profile *handler.ProfileHandler,
 	coach *handler.CoachHandler,
@@ -25,7 +25,7 @@ func NewEngine(
 	r.Use(gin.Logger(), gin.Recovery())
 	r.Static("/static", "./static")
 	db.Register(r)
-	users.Register(r)
+	authH.Register(r)
 	products.Register(r)
 	profile.Register(r)
 	coach.Register(r)

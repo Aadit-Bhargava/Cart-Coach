@@ -3,7 +3,7 @@
 package model
 
 import (
-	"fmt"
+	"errors"
 	"regexp"
 	"slices"
 	"strings"
@@ -88,13 +88,13 @@ func CleanList(in []string) []string {
 // Validate checks a profile that came from a request and normalises its lists.
 func (p *Profile) Validate() error {
 	if p.ProteinTargetG < 30 || p.ProteinTargetG > 200 {
-		return fmt.Errorf("protein_target_g must be between 30 and 200")
+		return errors.New("Choose a protein target between 30 and 200 g.")
 	}
 	if !slices.Contains(Diets, p.Diet) {
-		return fmt.Errorf("diet must be one of %v", Diets)
+		return errors.New("Choose a diet from the list.")
 	}
 	if p.Budget < 50 || p.Budget > 5000 {
-		return fmt.Errorf("budget must be between 50 and 5000")
+		return errors.New("Choose a budget between ₹50 and ₹5,000.")
 	}
 	p.Allergies = CleanList(p.Allergies)
 	p.Likes = CleanList(p.Likes)

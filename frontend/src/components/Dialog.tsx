@@ -7,10 +7,12 @@ interface Props {
   variant: "side" | "center";
   /** False for the first-run goal popup: no Close button, no Escape, no outside click. */
   dismissable?: boolean;
+  /** Softly blurs the page behind, so it stays visible but out of focus. */
+  blurBackdrop?: boolean;
   children: ReactNode;
 }
 
-export function Dialog({ open, onClose, label, variant, dismissable = true, children }: Props) {
+export function Dialog({ open, onClose, label, variant, dismissable = true, blurBackdrop = false, children }: Props) {
   const ref = useRef<HTMLDialogElement>(null);
 
   useEffect(() => {
@@ -24,7 +26,7 @@ export function Dialog({ open, onClose, label, variant, dismissable = true, chil
     <dialog
       ref={ref}
       aria-label={label}
-      className={`sheet ${variant === "side" ? "sheet-side" : "sheet-center"}`}
+      className={`sheet ${variant === "side" ? "sheet-side" : "sheet-center"}${blurBackdrop ? " sheet-blur" : ""}`}
       onCancel={(e) => {
         e.preventDefault();
         if (dismissable) onClose();

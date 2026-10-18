@@ -14,3 +14,9 @@ __debug_bin*
 *.csv.gz
 *.jsonl
 *.jsonl.gz
+
+# Local-only files, deliberately not pushed
+/CLAUDE.md
+/design/
+/backend/static/
+/backend/cmd/seed/

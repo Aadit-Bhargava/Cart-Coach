@@ -1,46 +1,76 @@
 # Contract for the Go service (implemented in backend/internal/handler).
 # Regenerate the TypeScript types with: npm run gen:api
 #
-# PROTOTYPE AUTH: routes marked "needs a user" read the caller from the
-# X-User-ID header. There are no passwords or tokens yet.
+# AUTH: email and password (POST /api/auth/signup and /api/auth/login). The server
+# sets a signed, HttpOnly session cookie, and routes marked "needs a user" read it.
 openapi: 3.0.3
 info:
   title: Cart Coach API
-  version: 0.2.0
+  version: 0.4.0
 paths:
-  /api/users:
+  /api/auth/signup:
     post:
-      operationId: registerUser
-      summary: Register a user
+      operationId: signUp
+      summary: Create an account with an email and password, and sign in. Sets the HttpOnly session cookie.
       requestBody:
         required: true
         content:
           application/json:
             schema:
               type: object
-              required: [email, name]
+              required: [name, email, password]
               properties:
+                name: { type: string, maxLength: 80 }
                 email: { type: string, format: email }
-                name: { type: string }
+                password: { type: string, minLength: 8, maxLength: 72 }
       responses:
         "201":
           description: The new user
           content:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
-        "409": { description: Email already in use }
-    get:
-      operationId: findUser
-      summary: Find a user by email (prototype sign-in)
-      parameters:
-        - { name: email, in: query, required: true, schema: { type: string } }
+        "400": { description: "Invalid name, email or password; the body has a plain-language `error`" }
+        "409": { description: An account with this email already exists }
+        "429": { description: Too many attempts }
+  /api/auth/login:
+    post:
+      operationId: logIn
+      summary: Log in with an email and password. Sets the HttpOnly session cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email: { type: string }
+                password: { type: string }
       responses:
         "200":
           description: The user
           content:
             application/json:
               schema: { $ref: "#/components/schemas/User" }
-        "404": { description: No such user }
+        "401": { description: The email and password don't match (the same answer whether or not the email exists) }
+        "429": { description: Too many failed attempts; try again later }
+  /api/auth/me:
+    get:
+      operationId: currentUser
+      summary: The signed-in user (needs a session)
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "401": { description: Not signed in }
+  /api/auth/logout:
+    post:
+      operationId: signOut
+      summary: End the session
+      responses:
+        "204": { description: Signed out }
   /api/products:
     get:
       operationId: listProducts

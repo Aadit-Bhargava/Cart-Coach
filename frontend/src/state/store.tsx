@@ -1,4 +1,5 @@
-import { createContext, useContext, useEffect, useMemo, useReducer, type Dispatch, type ReactNode } from "react";
+import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from "react";
+import { api } from "@/api";
 import { profileSchema } from "@/api/validate";
 import type { LogEntry, Profile, Suggestion } from "@/api/types";
 
@@ -8,12 +9,15 @@ export interface Line {
   by: Source;
 }
 
+/** A log entry. `client` marks entries the user caused here, which are also saved to the server. */
+export type LogItem = LogEntry & { client?: boolean };
+
 export interface State {
   lines: Record<number, Line>;
   profile: Profile | null;
   /** The user's original words, kept so they can retake the description. */
   goalText: string;
-  log: LogEntry[];
+  log: LogItem[];
   /** One-line explanation shown in the cart after Coach changed its mind. */
   note: string;
   /** Suggestions the user removed. Coach does not suggest them again. */
@@ -25,6 +29,7 @@ export type Action =
   | { type: "step"; id: number; delta: 1 | -1 }
   | { type: "keep"; id: number; name: string }
   | { type: "dismiss"; id: number; name: string }
+  | { type: "loaded"; profile: (Profile & { goal_text: string }) | null; log: LogEntry[] }
   | { type: "undoAll" }
   | { type: "clearSuggestions" }
   | { type: "saveProfile"; profile: Profile; text: string; summary: string }
@@ -33,6 +38,8 @@ export type Action =
 const STORAGE_KEY = "cartcoach.goal";
 
 function load(): Pick<State, "profile" | "goalText"> {
+  // With a backend, the profile comes from the server after sign-in.
+  if (api.requiresSignIn) return { profile: null, goalText: "" };
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return { profile: null, goalText: "" };
@@ -63,13 +70,18 @@ function reducer(s: State, a: Action): State {
       else lines[a.id] = { ...line, qty };
       return { ...s, note: "", lines };
     }
+    case "loaded": {
+      if (!a.profile) return { ...s, profile: null, goalText: "", log: a.log };
+      const { goal_text, ...profile } = a.profile;
+      return { ...s, profile, goalText: goal_text, log: a.log };
+    }
     case "keep": {
       const line = s.lines[a.id];
       if (!line) return s;
       return {
         ...s,
         lines: { ...s.lines, [a.id]: { ...line, by: "user" } },
-        log: [{ title: "You kept a suggestion", detail: a.name }, ...s.log],
+        log: [{ title: "You kept a suggestion", detail: a.name, client: true }, ...s.log],
       };
     }
     case "dismiss": {
@@ -79,7 +91,7 @@ function reducer(s: State, a: Action): State {
         ...s,
         lines,
         dismissed: [...s.dismissed, a.id],
-        log: [{ title: "You removed a suggestion", detail: a.name }, ...s.log],
+        log: [{ title: "You removed a suggestion", detail: a.name, client: true }, ...s.log],
       };
     }
     case "undoAll": {
@@ -90,7 +102,7 @@ function reducer(s: State, a: Action): State {
         ...s,
         lines,
         dismissed: [...s.dismissed, ...ids],
-        log: [{ title: `You undid ${ids.length} suggestions`, detail: "Cart returned to your own items." }, ...s.log],
+        log: [{ title: `You undid ${ids.length} suggestions`, detail: "Cart returned to your own items.", client: true }, ...s.log],
       };
     }
     case "clearSuggestions":
@@ -101,7 +113,7 @@ function reducer(s: State, a: Action): State {
         profile: a.profile,
         goalText: a.text,
         dismissed: [],
-        log: [{ title: s.profile ? "You updated what Coach understood" : "You set your goal", detail: a.summary }, ...s.log],
+        log: [{ title: s.profile ? "You updated what Coach understood" : "You set your goal", detail: a.summary, client: true }, ...s.log],
       };
     case "suggested": {
       const lines = Object.fromEntries(Object.entries(s.lines).filter(([, l]) => l.by === "user"));
@@ -118,12 +130,24 @@ export function StoreProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, undefined, init);
   const saved = useMemo(() => JSON.stringify({ profile: state.profile, goalText: state.goalText }), [state.profile, state.goalText]);
   useEffect(() => {
+    if (api.requiresSignIn) return; // the server keeps the profile
     try {
       localStorage.setItem(STORAGE_KEY, saved);
     } catch {
       // Private mode or full storage: the goal just won't survive a reload.
     }
   }, [saved]);
+  // Things the user did here (kept, removed, undid, changed goal) go into the server's log too.
+  const posted = useRef(new WeakSet<object>());
+  useEffect(() => {
+    if (!api.requiresSignIn) return;
+    for (const entry of state.log) {
+      if (!entry.client || posted.current.has(entry)) continue;
+      posted.current.add(entry);
+      api.addDecision({ title: entry.title, detail: entry.detail }).catch(() => undefined);
+    }
+  }, [state.log]);
+
   return (
     <StateContext.Provider value={state}>
       <DispatchContext.Provider value={dispatch}>{children}</DispatchContext.Provider>

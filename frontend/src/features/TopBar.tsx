@@ -8,9 +8,11 @@ interface Props {
   count: number;
   onCart: () => void;
   showCartButton: boolean;
+  userName?: string;
+  onSignOut?: () => void;
 }
 
-export function TopBar({ query, onQuery, profile, onGoal, count, onCart, showCartButton }: Props) {
+export function TopBar({ query, onQuery, profile, onGoal, count, onCart, showCartButton, userName, onSignOut }: Props) {
   return (
     <header className="sticky top-0 z-20 border-b border-line bg-ground/90 backdrop-blur">
       <div className="mx-auto grid max-w-[1560px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-3 px-4 py-3 md:px-7 lg:grid-cols-[220px_1fr_auto]">
@@ -37,6 +39,11 @@ export function TopBar({ query, onQuery, profile, onGoal, count, onCart, showCar
           />
         </search>
         <div className="flex items-center gap-2.5">
+          {userName && onSignOut && (
+            <button type="button" onClick={onSignOut} className="hidden min-h-11 rounded-xl px-2 text-sm text-muted underline underline-offset-4 md:block">
+              {userName}, sign out
+            </button>
+          )}
           <button type="button" onClick={onGoal} className="flex h-12 items-center gap-2 rounded-2xl bg-coach-tint px-4 font-bold text-coach">
             Goal
             <span className="hidden font-medium text-ink sm:inline">{profile ? `${profile.protein_target_g} g protein` : "Set your goal"}</span>

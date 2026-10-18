@@ -22,6 +22,9 @@ type Config struct {
 
 	GeminiAPIKey string // GEMINI_API_KEY; empty means AI routes answer 503
 	GeminiModel  string // GEMINI_MODEL, default gemini-3.1-flash-lite
+
+	SessionSecret string // SESSION_SECRET: signs the session cookie
+	CookieSecure  bool   // COOKIE_SECURE=true in production (HTTPS)
 }
 
 // New loads .env (if present) and builds a Config from the environment.
@@ -42,6 +45,9 @@ func New() (*Config, error) {
 
 		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
 		GeminiModel:  getenv("GEMINI_MODEL", "gemini-3.1-flash-lite"),
+
+		SessionSecret: os.Getenv("SESSION_SECRET"),
+		CookieSecure:  os.Getenv("COOKIE_SECURE") == "true",
 	}
 	if cfg.URL != "" {
 		return cfg, nil
