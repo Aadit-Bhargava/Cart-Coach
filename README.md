@@ -1,37 +1,37 @@
-# Cart-Coach
+# Cart Coach
 
-## How protein targets work
+**A normal-looking online food store whose cart helps you reach your goal. Always with your consent, and it never checks out.**
 
-Coach works out a **daily protein target** from the person's age, weight, height and activity level, then
-multiplies it by how many days the cart covers (1, 3 or 7). The rule lives in
-`backend/internal/nutrition/target.go` (and is mirrored for demo mode in `frontend/src/lib/target.ts`):
+Built for the **Google Cloud AI Builder Cup 2026 (JAPAC)**, theme **Retail & Commerce**.
 
-| Activity | Grams of protein per kg of body weight per day |
-|---|---|
-| Everyday movement | 0.8 (1.0 from age 65) |
-| Regular exercise | 1.2 |
-| Endurance training | 1.5 |
-| Strength training | 1.6 |
+### 👉 Deployed link: https://cart-coach-926097823266.asia-south1.run.app/
 
-Height is only used to cap the weight the rule applies to, so nobody gets an extreme target. The result is
-rounded to 5 g and kept between 40 and 220 g a day, and the person can edit it.
+Team: **Steins Gate** (leader: Aadit Bhargava)
 
-These factors follow common sports-nutrition ranges. They are **general guidance, not medical or dietary
-advice, and not a clinically validated model.** Age, weight and height are used only to compute the target,
-are stored on the person's profile, and are never written to logs or sent to Gemini.
+> All products, nutrition values and prices are generated demo data. Brands are fictional.
 
-Gemini only reads the person's own words (activity, diet, allergies, likes) and chooses among items that Go
-code has already checked against diet, allergies, budget and the protein gap. Every number shown comes from
-the product catalog or the rule above.
+## What it is
 
-### Checking the Gemini prompt
+People who shop for food with a goal ("vegetarian, 50 g protein a day, on a budget") have to read labels and do the maths themselves. Cart Coach does it for them.
 
-A set of 12 example goals (including a prompt-injection attempt and a distress message) runs against the real
-API. It makes a few small requests, so it is off by default:
+It looks and works like any online food store. The difference is in the cart: when you add items, Coach suggests a few more that help you reach your goal, each one labelled with a reason. You decide what stays.
 
-```bash
-cd backend && go test -tags live -run TestUnderstandPromptLive -v ./internal/coach/
-```
+## How it works
 
-It reads `GEMINI_API_KEY` from the environment or from `backend/.env`. A rare failure from a slow response is
-expected occasionally; run the single case again before changing the prompt.
+1. **Tell it your goal in your own words.** For example: *"I'm vegetarian and active, 50 g protein a day. I avoid dairy and like peanuts."* Gemini turns this into a small profile (protein target, diet, allergies, likes, budget). You see it and can edit it before saving.
+2. **Shop as usual.** Browse, search and add items. The shelves show only ordinary product information.
+3. **Coach adds suggestions to your cart.** Up to three at a time, marked **Suggested by Coach**, each with a short reason such as "+37 g protein, ₹57 more". A protein meter at the top of the cart shows how close you are to your goal.
+4. **You stay in control.** Keep or remove each suggestion, undo them all in one tap, or press **Not this** and say what you want instead. If Coach can't add it (for example paneer for someone who avoids dairy), it tells you why. Nothing is ever bought. There is no checkout.
+5. **See the reasons.** The decision log shows what Coach changed, why, and where each number came from.
+
+Suggestions always respect your diet, allergies and budget. Auto-add only runs if you switch it on.
+
+## Good to know
+
+- Your protein target comes from a simple, fixed rule based on age, weight, height and activity, and you can change it. It is general guidance, **not medical or dietary advice**. The app is for people aged 18 and over.
+- Age, weight and height are used only to work out the target. They are never sent to Gemini.
+- If someone's goal text suggests distress, Coach replies kindly and points to professional help instead of giving targets.
+
+## Built with Google Cloud
+
+Gemini (understanding your goal and choosing suggestions), Cloud Run (hosting) and Secret Manager (keys).
