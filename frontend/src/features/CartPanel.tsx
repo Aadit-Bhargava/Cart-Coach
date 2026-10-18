@@ -1,6 +1,7 @@
-import { Button, LinkButton, Loading, Tile, cx } from "@/components/ui";
+import { Button, LinkButton, Loading, ProductImage, cx } from "@/components/ui";
 import { Stepper } from "@/components/Stepper";
 import { grams, inr, plural } from "@/lib/format";
+import { whatToDo } from "@/lib/errors";
 import { describeProfile } from "@/lib/profile";
 import type { ProductView } from "@/lib/product";
 import { useCartView, type CartLine } from "@/state/cart";
@@ -47,7 +48,7 @@ export function CartPanel({ byId, onGoal, onLog, className }: Props) {
         {coach.status === "error" && (
           <div role="alert" className="mt-3 rounded-2xl bg-[#fdeaea] p-3.5 text-[#8a1f1f]">
             <b className="block">Coach couldn't find upgrades</b>
-            Your cart is unchanged. Check your connection and try again.
+            Your cart hasn't changed. {whatToDo(coach.error)}
             <div>
               <LinkButton className="!text-[#8a1f1f]" onClick={coach.retry}>
                 Try again
@@ -167,7 +168,7 @@ function UserLine({ product, line }: CartLine) {
   const dispatch = useDispatch();
   return (
     <div className="grid grid-cols-[52px_1fr_auto] items-center gap-3 border-b border-line py-3">
-      <Tile category={product.category} className="size-[52px] rounded-xl" textClass="text-2xl" />
+      <ProductImage product={product} className="size-[52px] rounded-xl" textClass="text-2xl" />
       <div>
         <div className="line-clamp-2 font-semibold leading-tight">{product.name}</div>
         <div className="text-[13px] text-muted">{product.packText}</div>
@@ -185,7 +186,7 @@ function CoachLine({ product }: CartLine) {
   const toast = useToast();
   return (
     <div className="my-2 grid grid-cols-[52px_1fr] gap-3 rounded-2xl border-l-4 border-coach bg-coach-tint p-3">
-      <Tile category={product.category} className="size-[52px] rounded-xl !bg-white !text-coach" textClass="text-2xl" />
+      <ProductImage product={product} className="size-[52px] rounded-xl !bg-white !text-coach" textClass="text-2xl" />
       <div>
         <span className="mb-1 inline-block rounded-lg bg-coach px-2.5 py-0.5 text-xs font-bold text-white">Suggested by Coach</span>
         <div className="line-clamp-2 font-semibold leading-tight">{product.name}</div>

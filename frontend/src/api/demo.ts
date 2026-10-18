@@ -14,6 +14,26 @@ const byId = new Map(views.map((v) => [v.id, v]));
 
 /** Runs the whole backend in the browser: generated sample data and a rule-based Coach. */
 export const demoApi: CartCoachApi = {
+  requiresSignIn: false,
+  async signUp(name, email) {
+    return { id: 0, email, name };
+  },
+  async logIn(email) {
+    return { id: 0, email, name: "Demo" };
+  },
+  async currentUser() {
+    return null;
+  },
+  async signOut() {},
+  async getProfile() {
+    return null;
+  },
+  async saveProfile() {},
+  async listDecisions() {
+    return [];
+  },
+  async addDecision() {},
+
   async listProducts() {
     await delay(250);
     return products;

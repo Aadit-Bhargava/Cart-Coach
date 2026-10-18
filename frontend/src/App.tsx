@@ -7,16 +7,20 @@ import { useCartView } from "@/state/cart";
 import { useCatalog } from "@/state/catalog";
 import { CoachProvider } from "@/state/coach";
 import { StoreProvider, useStore } from "@/state/store";
+import { Session } from "@/features/Session";
+import { useAuth } from "@/state/auth";
 import { CartPanel } from "@/features/CartPanel";
 import { CategoryNav } from "@/features/CategoryNav";
 import { GoalContent } from "@/features/GoalDialog";
+import { SignInContent } from "@/features/SignIn";
 import { LogContent } from "@/features/LogDialog";
 import { ProductCard } from "@/features/ProductCard";
 import { ProductDetail } from "@/features/ProductDetail";
 import { TopBar } from "@/features/TopBar";
+import { whatToDo } from "@/lib/errors";
 import { inr, plural } from "@/lib/format";
 
-type Overlay = { kind: "product"; id: number } | { kind: "goal"; first: boolean } | { kind: "log" } | null;
+type Overlay = { kind: "product"; id: number } | { kind: "goal"; first: boolean } | { kind: "log" } | { kind: "signin" } | null;
 type Sort = "featured" | "low" | "high" | "az";
 const PAGE = 60;
 
@@ -24,9 +28,11 @@ export function App() {
   return (
     <StoreProvider>
       <ToastProvider>
-        <CoachProvider>
-          <Shop />
-        </CoachProvider>
+        <Session>
+          <CoachProvider>
+            <Shop />
+          </CoachProvider>
+        </Session>
       </ToastProvider>
     </StoreProvider>
   );
@@ -34,21 +40,26 @@ export function App() {
 
 function Shop() {
   const { profile } = useStore();
+  const auth = useAuth();
   const toast = useToast();
-  const { products, byId, status, retry } = useCatalog();
+  const { products, byId, status, error, retry } = useCatalog();
   const cart = useCartView(byId);
   const wide = useMediaQuery("(min-width: 1280px)");
 
   const [overlay, setOverlay] = useState<Overlay>(null);
-  const [firstRunSeen, setFirstRunSeen] = useState(Boolean(profile));
+  const [firstRunSeen, setFirstRunSeen] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("featured");
   const [shown, setShown] = useState(PAGE);
 
-  // The goal popup greets a new user once. It stays up until they save or skip.
-  const activeOverlay: Overlay = overlay ?? (!firstRunSeen && status === "success" ? { kind: "goal", first: true } : null);
+  // Not signed in: the sign-in popup sits over the homepage and cannot be dismissed.
+  // Then the goal popup greets a new user once; it stays up until they save or skip.
+  const needsSignIn = auth.status === "signedOut" || auth.status === "error";
+  const activeOverlay: Overlay = needsSignIn
+    ? { kind: "signin" }
+    : (overlay ?? (!firstRunSeen && !profile && auth.ready && status === "success" ? { kind: "goal", first: true } : null));
   const closeOverlay = () => {
     setFirstRunSeen(true);
     setOverlay(null);
@@ -87,6 +98,8 @@ function Shop() {
         count={cart.count}
         onCart={() => setRailOpen(true)}
         showCartButton={!wide}
+        userName={auth.user?.name}
+        onSignOut={auth.signOut}
       />
 
       <div className="mx-auto grid max-w-[1560px] gap-4 px-4 pb-24 pt-5 md:px-7 lg:grid-cols-[220px_minmax(0,1fr)] lg:gap-7 xl:grid-cols-[220px_minmax(0,1fr)_400px]">
@@ -123,7 +136,7 @@ function Shop() {
           {status === "error" && (
             <div role="alert" className="rounded-2xl bg-white p-10 text-center">
               <b className="block font-display text-lg">Products didn't load</b>
-              <span className="text-muted">Check your connection, then try again.</span>
+              <span className="text-muted">{whatToDo(error)}</span>
               <div>
                 <LinkButton onClick={retry}>Try again</LinkButton>
               </div>
@@ -189,6 +202,9 @@ function Shop() {
 
       <Dialog open={activeOverlay?.kind === "product" && Boolean(product)} onClose={closeOverlay} variant="side" label="Product details">
         {product && <ProductDetail product={product} />}
+      </Dialog>
+      <Dialog open={activeOverlay?.kind === "signin"} onClose={() => undefined} variant="center" label="Sign in" dismissable={false} blurBackdrop>
+        <SignInContent />
       </Dialog>
       <Dialog open={activeOverlay?.kind === "log"} onClose={closeOverlay} variant="side" label="Decision log">
         <LogContent />

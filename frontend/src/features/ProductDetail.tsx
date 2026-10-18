@@ -1,4 +1,4 @@
-import { Button, Tile } from "@/components/ui";
+import { Button, ProductImage } from "@/components/ui";
 import { Stepper } from "@/components/Stepper";
 import { grams, inr } from "@/lib/format";
 import type { ProductView } from "@/lib/product";
@@ -15,7 +15,7 @@ export function ProductDetail({ product }: { product: ProductView }) {
         {product.brand}
         {product.packText ? `, ${product.packText}` : ""}
       </p>
-      <Tile category={product.category} className="mt-4 h-[150px] rounded-[18px]" textClass="text-8xl" />
+      <ProductImage product={product} className="mt-4 h-[150px] rounded-[18px]" textClass="text-8xl" />
 
       <div className="mt-4 flex items-center justify-between gap-4">
         <div>
@@ -44,7 +44,7 @@ export function ProductDetail({ product }: { product: ProductView }) {
           <>
             <b className="block font-display text-[1.9rem] leading-[1.1] tracking-tight text-coach">Not enough data</b>
             <span className="text-sm">
-              {product.proteinKnown ? "We need the pack size in grams to work out protein per ₹." : "The saved protein value looks wrong, so Coach skips this product."}
+              {product.proteinKnown ? "This pack isn't sold by weight in grams, so we can't work out protein per ₹." : "This product's protein value looks off, so Coach won't suggest it."}
             </span>
           </>
         )}

@@ -2,8 +2,9 @@ import { useMutation } from "@tanstack/react-query";
 import { useState } from "react";
 import { api } from "@/api";
 import { SupportMessage } from "@/api/http";
-import type { Diet } from "@/api/types";
+import type { Diet, SavedProfile } from "@/api/types";
 import { Button, LinkButton, Loading, field } from "@/components/ui";
+import { whatToDo } from "@/lib/errors";
 import { DIET_LABEL, describeProfile, splitList } from "@/lib/profile";
 import { useDispatch, useStore } from "@/state/store";
 
@@ -51,11 +52,22 @@ export function GoalContent({ first, onDone }: Props) {
     understand.mutate(text.trim());
   };
 
+  const saveProfile = useMutation({ mutationFn: (p: SavedProfile) => api.saveProfile(p) });
+
   const save = () => {
     if (!(protein >= 30 && protein <= 200)) return setError("Enter a protein target between 30 and 200 g.");
     const p = { protein_target_g: Math.round(protein), diet, allergies: splitList(allergies), likes: splitList(likes), budget, auto_add: auto };
-    dispatch({ type: "saveProfile", profile: p, text: text.trim(), summary: describeProfile(p) });
-    onDone(true);
+    setError("");
+    saveProfile.mutate(
+      { ...p, goal_text: text.trim() },
+      {
+        onSuccess: () => {
+          dispatch({ type: "saveProfile", profile: p, text: text.trim(), summary: describeProfile(p) });
+          onDone(true);
+        },
+        onError: (e) => setError(`We couldn't save your goal. ${whatToDo(e)}`),
+      },
+    );
   };
 
   if (step === "understanding") {
@@ -103,8 +115,8 @@ export function GoalContent({ first, onDone }: Props) {
           </span>
         </label>
         {error && <p role="alert" className="mt-3 font-semibold text-[#8a1f1f]">{error}</p>}
-        <Button variant="solid" className="mt-5 h-[52px] w-full rounded-2xl" onClick={save}>
-          Save and show suggestions
+        <Button variant="solid" disabled={saveProfile.isPending} className="mt-5 h-[52px] w-full rounded-2xl" onClick={save}>
+          {saveProfile.isPending ? "Saving..." : "Save and show suggestions"}
         </Button>
         <div className="mt-1 text-center">
           <LinkButton onClick={() => setStep("describe")}>Describe again</LinkButton>
@@ -145,7 +157,7 @@ export function GoalContent({ first, onDone }: Props) {
       )}
       {understand.isError && !(understand.error instanceof SupportMessage) && (
         <p role="alert" className="mt-3 font-semibold text-[#8a1f1f]">
-          Coach couldn't read that just now. Try again, or skip and set your goal later.
+          Coach couldn't read that right now. {whatToDo(understand.error)}
         </p>
       )}
       {error && <p role="alert" className="mt-3 font-semibold text-[#8a1f1f]">{error}</p>}

@@ -1,4 +1,5 @@
-import type { ButtonHTMLAttributes, ReactNode } from "react";
+import { useState, type ButtonHTMLAttributes, type ReactNode } from "react";
+import type { ProductView } from "@/lib/product";
 
 const cx = (...c: (string | false | undefined)[]) => c.filter(Boolean).join(" ");
 
@@ -64,6 +65,13 @@ export function Tile({ category, className, textClass = "text-6xl" }: { category
       {category.charAt(0)}
     </div>
   );
+}
+
+/** The product's pack image from the backend, or the neutral tile if it is missing or fails to load. */
+export function ProductImage({ product, className, textClass }: { product: ProductView; className?: string; textClass?: string }) {
+  const [failed, setFailed] = useState(false);
+  if (!product.image_url || failed) return <Tile category={product.category} className={className} textClass={textClass} />;
+  return <img src={product.image_url} alt="" loading="lazy" onError={() => setFailed(true)} className={cx("bg-tile object-cover", className)} />;
 }
 
 export const field =

@@ -11,5 +11,5 @@ export function useCatalog() {
     select: (products) => products.map(toView),
   });
   const byId = useMemo(() => new Map<number, ProductView>((query.data ?? []).map((p) => [p.id, p])), [query.data]);
-  return { products: query.data ?? [], byId, status: query.status, retry: () => void query.refetch() };
+  return { products: query.data ?? [], byId, status: query.status, error: query.error, retry: () => void query.refetch() };
 }
