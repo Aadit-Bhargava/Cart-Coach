@@ -12,6 +12,7 @@ import (
 	"github.com/aaditbhargava/cart-coach/internal/auth"
 	"github.com/aaditbhargava/cart-coach/internal/coach"
 	"github.com/aaditbhargava/cart-coach/internal/model"
+	"github.com/aaditbhargava/cart-coach/internal/nutrition"
 	"github.com/aaditbhargava/cart-coach/internal/repository"
 )
 
@@ -38,23 +39,71 @@ func (h *ProfileHandler) Register(r *gin.Engine) {
 	auth.GET("/profile", h.Get)
 	auth.PUT("/profile", h.Put)
 	auth.POST("/profile/understand", RateLimit(15), h.Understand)
+	auth.POST("/profile/target", h.Target)
+}
+
+// statsRequest carries the personal details behind the protein target. They are
+// used to compute the target and are never logged or sent to Gemini.
+type statsRequest struct {
+	AgeYears int     `json:"age_years"`
+	WeightKg float64 `json:"weight_kg"`
+	HeightCm float64 `json:"height_cm"`
+}
+
+func (s statsRequest) stats() nutrition.Stats {
+	return nutrition.Stats{AgeYears: s.AgeYears, WeightKg: s.WeightKg, HeightCm: s.HeightCm}
+}
+
+type targetRequest struct {
+	statsRequest
+	Activity string `json:"activity"`
+}
+
+// Target works out the daily protein for the given details and activity. It
+// saves nothing; the goal popup calls it when the user changes their activity.
+func (h *ProfileHandler) Target(c *gin.Context) {
+	var req targetRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Check your age, weight and height, then try again."})
+		return
+	}
+	stats := req.stats()
+	if err := stats.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	activity, ok := nutrition.ParseActivity(req.Activity)
+	if !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Choose an activity level from the list."})
+		return
+	}
+	grams, basis := nutrition.DailyProtein(stats, activity)
+	c.JSON(http.StatusOK, gin.H{"daily_protein_g": grams, "basis": basis})
 }
 
 type understandRequest struct {
+	statsRequest
 	Text string `json:"text"`
 }
 
-// Understand turns the user's own words into a profile for them to review. It
-// saves nothing; the user confirms the result with PUT /api/profile.
+// Understand turns the user's own words into a profile for them to review. Gemini
+// only reads the words (activity, diet, allergies, likes); the protein target is
+// computed here from the personal details. It saves nothing; the user confirms
+// the result with PUT /api/profile.
 func (h *ProfileHandler) Understand(c *gin.Context) {
 	var req understandRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "Write a few words about your goal."})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Write a few words about your goal, and check your age, weight and height."})
 		return
 	}
 	text := strings.TrimSpace(req.Text)
 	if n := utf8.RuneCountInString(text); n < 8 || n > 500 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Describe your goal in 8 to 500 characters."})
+		return
+	}
+	stats := req.stats()
+	if err := stats.Validate(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 	u, err := h.gemini.Understand(c.Request.Context(), text)
@@ -72,8 +121,11 @@ func (h *ProfileHandler) Understand(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"support_message": supportMessage})
 		return
 	}
+	activity, _ := nutrition.ParseActivity(u.Activity) // CleanUnderstanding guarantees a valid value
+	grams, basis := nutrition.ResolveDaily(stats, activity, u.StatedDailyProteinG)
 	c.JSON(http.StatusOK, gin.H{"understanding": gin.H{
 		"activity": u.Activity, "diet": u.Diet, "allergies": u.Allergies, "likes": u.Likes,
+		"daily_protein_g": grams, "basis": basis,
 	}})
 }
 
@@ -101,6 +153,12 @@ func (h *ProfileHandler) Put(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
+	if err := req.ValidateDetails(); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+	req.ApplyTarget() // the cart target is always computed here, never taken from the browser
+	req.DetailsComplete = true
 	req.GoalText = strings.TrimSpace(req.GoalText)
 	if n := utf8.RuneCountInString(req.GoalText); n < 8 || n > 500 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "Describe your goal in 8 to 500 characters."})
