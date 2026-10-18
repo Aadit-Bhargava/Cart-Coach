@@ -124,6 +124,23 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/profile/target": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Work out the daily protein for these details and activity (needs a user). Saves nothing. */
+        post: operations["profileTarget"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/coach/suggest": {
         parameters: {
             query?: never;
@@ -189,6 +206,7 @@ export interface components {
         /** @enum {string} */
         Diet: "veg" | "vegan" | "eggetarian" | "non-veg" | "unknown";
         Profile: {
+            /** @description Protein for the whole cart */
             protein_target_g: number;
             diet: components["schemas"]["Diet"];
             allergies: string[];
@@ -197,16 +215,36 @@ export interface components {
             budget: number;
             /** @description The user's consent to pre-fill the cart */
             auto_add: boolean;
+            /** @description Whole years */
+            age_years: number | null;
+            /** @description 30 to 250. Null on older profiles. */
+            weight_kg: number | null;
+            /** @description 120 to 230. Null on older profiles. */
+            height_cm: number | null;
+            /** @description One of the Activity values, or an empty string on older profiles */
+            activity: string;
+            /** @description Days the cart covers: 1, 3 or 7, or 0 on older profiles */
+            days: number;
+            /** @description Daily protein, 40 to 220, or 0 on older profiles */
+            daily_protein_g: number;
         };
+        /** @enum {string} */
+        Activity: "general" | "active" | "endurance" | "strength";
         SavedProfile: components["schemas"]["Profile"] & {
+            /** @description False for profiles saved before the personal details existed; Coach stays paused until they are added */
+            details_complete: boolean;
             /** @description The user's own words */
             goal_text: string;
         };
         Understanding: {
-            protein_target_g: number;
+            activity: components["schemas"]["Activity"];
             diet: components["schemas"]["Diet"];
             allergies: string[];
             likes: string[];
+            /** @description Daily protein from the rule, or the amount the user stated */
+            daily_protein_g: number;
+            /** @description A plain sentence that explains the daily amount */
+            basis: string;
         };
         /** @description Exactly one of the two fields is set */
         UnderstandResponse: {
@@ -467,6 +505,9 @@ export interface operations {
             content: {
                 "application/json": {
                     text: string;
+                    age_years: number;
+                    weight_kg: number;
+                    height_cm: number;
                 };
             };
         };
@@ -489,6 +530,45 @@ export interface operations {
             };
         };
     };
+    profileTarget: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    age_years: number;
+                    weight_kg: number;
+                    height_cm: number;
+                    activity: components["schemas"]["Activity"];
+                };
+            };
+        };
+        responses: {
+            /** @description The daily protein and a plain sentence that explains it */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        daily_protein_g: number;
+                        basis: string;
+                    };
+                };
+            };
+            /** @description Invalid details; the body has a plain-language `error` */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     suggestItems: {
         parameters: {
             query?: never;
@@ -499,7 +579,6 @@ export interface operations {
         requestBody: {
             content: {
                 "application/json": {
-                    profile: components["schemas"]["Profile"];
                     /** @description The user's own items only */
                     cart: {
                         product_id: number;
@@ -525,6 +604,13 @@ export interface operations {
             };
             /** @description Auto-add is off in this profile */
             403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description The profile has no age */
+            409: {
                 headers: {
                     [name: string]: unknown;
                 };

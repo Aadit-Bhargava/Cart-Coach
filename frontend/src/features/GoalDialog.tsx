@@ -32,9 +32,9 @@ export function GoalContent({ first, onDone }: Props) {
   const [likes, setLikes] = useState(profile?.likes.join(", ") ?? "");
 
   const understand = useMutation({
-    mutationFn: (t: string) => api.understandGoal(t),
+    mutationFn: (t: string) => api.understandGoal(t, { age_years: 30, weight_kg: 70, height_cm: 170 }), // placeholder stats until Task 7 adds the fields
     onSuccess: (u) => {
-      setProtein(u.protein_target_g);
+      setProtein(u.daily_protein_g);
       setDiet(u.diet);
       setAllergies(u.allergies.join(", "));
       setLikes(u.likes.join(", "));
@@ -56,10 +56,13 @@ export function GoalContent({ first, onDone }: Props) {
 
   const save = () => {
     if (!(protein >= 30 && protein <= 200)) return setError("Enter a protein target between 30 and 200 g.");
-    const p = { protein_target_g: Math.round(protein), diet, allergies: splitList(allergies), likes: splitList(likes), budget, auto_add: auto };
+    const p = { protein_target_g: Math.round(protein), diet, allergies: splitList(allergies), likes: splitList(likes), budget, auto_add: auto,
+      // replaced in Task 7
+      age_years: null, weight_kg: null, height_cm: null, activity: "", days: 0, daily_protein_g: 0,
+    };
     setError("");
     saveProfile.mutate(
-      { ...p, goal_text: text.trim() },
+      { ...p, goal_text: text.trim(), details_complete: false },
       {
         onSuccess: () => {
           dispatch({ type: "saveProfile", profile: p, text: text.trim(), summary: describeProfile(p) });

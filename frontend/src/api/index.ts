@@ -14,7 +14,8 @@ const demoApi: CartCoachApi = {
   listDecisions: async () => (await demo()).listDecisions(),
   addDecision: async (d) => (await demo()).addDecision(d),
   listProducts: async () => (await demo()).listProducts(),
-  understandGoal: async (text) => (await demo()).understandGoal(text),
+  understandGoal: async (text, stats) => (await demo()).understandGoal(text, stats),
+  profileTarget: async (stats, activity) => (await demo()).profileTarget(stats, activity),
   suggestItems: async (req) => (await demo()).suggestItems(req),
 };
 

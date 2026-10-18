@@ -38,7 +38,7 @@ export function CoachProvider({ children }: { children: ReactNode }) {
   const mutation = useMutation({
     mutationFn: (req: { profileChanged: boolean }) => {
       if (!profile) throw new Error("No profile");
-      return api.suggestItems({ profile, cart: userItems, excluded_product_ids: dismissed }).then((res) => ({ res, ...req }));
+      return api.suggestItems({ cart: userItems, excluded_product_ids: dismissed }).then((res) => ({ res, ...req }));
     },
   });
   const { mutate, reset } = mutation;
