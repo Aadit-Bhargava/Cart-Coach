@@ -206,8 +206,9 @@ function UserLine({ product, line }: CartLine) {
     <div className="grid grid-cols-[52px_1fr_auto] items-center gap-3 border-b border-line py-3">
       <ProductImage product={product} className="size-[52px] rounded-xl" textClass="text-2xl" />
       <div>
-        <div className="line-clamp-2 font-semibold leading-tight">
-          <DietMark diet={product.diet} /> {product.name}
+        <div className="flex items-start gap-1.5 font-semibold leading-tight">
+          <DietMark diet={product.diet} />
+          <span className="line-clamp-2">{product.name}</span>
         </div>
         <div className="text-[13px] text-muted">{product.packText}</div>
       </div>
@@ -229,8 +230,9 @@ function CoachLine({ product }: CartLine) {
       <ProductImage product={product} className="size-[52px] rounded-xl !bg-white !text-coach" textClass="text-2xl" />
       <div>
         <span className="mb-1 inline-block rounded-lg bg-coach px-2.5 py-0.5 text-xs font-bold text-white">Suggested by Coach</span>
-        <div className="line-clamp-2 font-semibold leading-tight">
-          <DietMark diet={product.diet} /> {product.name}
+        <div className="flex items-start gap-1.5 font-semibold leading-tight">
+          <DietMark diet={product.diet} />
+          <span className="line-clamp-2">{product.name}</span>
         </div>
         <div className="text-[13px] text-muted">
           {product.packText}, {inr(product.price)} demo price{product.proteinPerRupee != null ? `, ${product.proteinPerRupee.toFixed(2)} g per ₹` : ""}
