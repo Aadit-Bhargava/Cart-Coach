@@ -1,0 +1,19 @@
+# Files that are NOT uploaded by `gcloud run deploy --source .`.
+# backend/static/images is deliberately uploaded: it is kept out of git but shipped in the image.
+.gcloudignore
+.git
+.gitignore
+.claude
+.vscode
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/node_modules
+frontend/dist
+backend/web/dist
+design
+CLAUDE.md
+bin/
+**/*.tsbuildinfo
