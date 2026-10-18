@@ -1,0 +1,16 @@
+.git
+.gitignore
+.claude
+.vscode
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+**/node_modules
+frontend/dist
+backend/web/dist
+design
+CLAUDE.md
+bin/
+**/*.tsbuildinfo

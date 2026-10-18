@@ -23,12 +23,16 @@ func NewEngine(
 ) *gin.Engine {
 	r := gin.New()
 	r.Use(gin.Logger(), gin.Recovery())
-	r.Static("/static", "./static")
+	// Product pack images. They change rarely, so let browsers keep them for a day.
+	static := r.Group("/static")
+	static.Use(func(c *gin.Context) { c.Header("Cache-Control", "public, max-age=86400") })
+	static.StaticFS("/", gin.Dir("./static", false))
 	db.Register(r)
 	authH.Register(r)
 	products.Register(r)
 	profile.Register(r)
 	coach.Register(r)
+	serveApp(r)
 	return r
 }
 

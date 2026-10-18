@@ -20,3 +20,8 @@ __debug_bin*
 /design/
 /backend/static/
 /backend/cmd/seed/
+/DEPLOY.md
+
+# The frontend build is copied here by the Docker build, then embedded in the server
+/backend/web/dist/*
+!/backend/web/dist/.gitkeep
