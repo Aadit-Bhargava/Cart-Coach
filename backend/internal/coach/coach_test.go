@@ -189,6 +189,14 @@ func TestVerifyDropsBannedWhy(t *testing.T) {
 		"Might cure fatigue",
 		"Great for young athletes",
 		"Helps you lose fat",
+		"Prevents cramps on long runs",
+		"Treats tiredness",
+		"Cures cravings",
+		"Helps with losing fat",
+		"Burns slowly through the day",
+		"Great for older shoppers",
+		"Builds bodies",
+		"Supports weight loss",
 	}
 	for _, why := range dropped {
 		got := Verify([]Choice{{ProductID: 1, Why: why}}, plan)

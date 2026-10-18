@@ -62,7 +62,7 @@ func Fallback(plan Plan) []model.Suggestion {
 
 // bannedWhy lists words a "why" must not contain. It keeps the model from
 // mentioning the person's body, weight or age, or making health claims.
-var bannedWhy = regexp.MustCompile(`(?i)\b(weight|kg|kilo|bmi|age|aged|old|young|body|overweight|underweight|obese|skinny|thin|cure|treat|prevent|disease|lose|burn)\b`)
+var bannedWhy = regexp.MustCompile(`(?i)\b(weight|weighs|kg|kgs|kilo|kilos|bmi|age|ages|aged|old|older|young|younger|body|bodies|overweight|underweight|obese|skinny|thin|thinner|cure|cures|cured|curing|treat|treats|treated|treating|prevent|prevents|prevented|preventing|prevention|disease|diseases|lose|loses|losing|loss|burn|burns|burned|burning)\b`)
 
 func cleanWhy(s string) string {
 	s = strings.TrimSpace(s)
