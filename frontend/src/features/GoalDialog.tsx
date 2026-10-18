@@ -247,7 +247,7 @@ export function GoalContent({ first, mode, onDone }: Props) {
               maxLength={500}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder="I'm a skinny guy training for an Ironman. Vegetarian, love paneer and peanuts."
+              placeholder="Training for an Ironman. Vegetarian, love paneer and peanuts."
             />
           </label>
           <label className="mt-4 block font-semibold">
