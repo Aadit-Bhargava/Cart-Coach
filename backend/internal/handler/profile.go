@@ -73,7 +73,7 @@ func (h *ProfileHandler) Understand(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"understanding": gin.H{
-		"protein_target_g": u.ProteinTargetG, "diet": u.Diet, "allergies": u.Allergies, "likes": u.Likes,
+		"activity": u.Activity, "diet": u.Diet, "allergies": u.Allergies, "likes": u.Likes,
 	}})
 }
 
