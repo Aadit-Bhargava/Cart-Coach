@@ -66,3 +66,18 @@ func (r *UserRepository) GetByEmail(ctx context.Context, email string) (*User, e
 	}
 	return u, nil
 }
+
+// GetByID returns the user with the given id.
+func (r *UserRepository) GetByID(ctx context.Context, id int64) (*User, error) {
+	u := &User{}
+	err := r.pool.QueryRow(ctx,
+		`select id, email, name, created_at from users where id = $1`, id,
+	).Scan(&u.ID, &u.Email, &u.Name, &u.CreatedAt)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return nil, ErrUserNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return u, nil
+}

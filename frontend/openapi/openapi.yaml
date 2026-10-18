@@ -1,0 +1,248 @@
+# Contract for the Go service (implemented in backend/internal/handler).
+# Regenerate the TypeScript types with: npm run gen:api
+#
+# PROTOTYPE AUTH: routes marked "needs a user" read the caller from the
+# X-User-ID header. There are no passwords or tokens yet.
+openapi: 3.0.3
+info:
+  title: Cart Coach API
+  version: 0.2.0
+paths:
+  /api/users:
+    post:
+      operationId: registerUser
+      summary: Register a user
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, name]
+              properties:
+                email: { type: string, format: email }
+                name: { type: string }
+      responses:
+        "201":
+          description: The new user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "409": { description: Email already in use }
+    get:
+      operationId: findUser
+      summary: Find a user by email (prototype sign-in)
+      parameters:
+        - { name: email, in: query, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: The user
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/User" }
+        "404": { description: No such user }
+  /api/products:
+    get:
+      operationId: listProducts
+      summary: List catalog products (public)
+      responses:
+        "200":
+          description: All products
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [products]
+                properties:
+                  products:
+                    type: array
+                    items: { $ref: "#/components/schemas/Product" }
+  /api/profile:
+    get:
+      operationId: getProfile
+      summary: The saved profile (needs a user)
+      responses:
+        "200":
+          description: The profile with the user's original words
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SavedProfile" }
+        "404": { description: No profile yet }
+    put:
+      operationId: saveProfile
+      summary: Save the profile the user confirmed (needs a user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/SavedProfile" }
+      responses:
+        "200":
+          description: The saved profile
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/SavedProfile" }
+        "400": { description: Invalid profile }
+  /api/profile/understand:
+    post:
+      operationId: understandGoal
+      summary: Turn the user's free-text goal into a profile with Gemini (needs a user). Saves nothing; the user reviews the result first.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 8, maxLength: 500 }
+      responses:
+        "200":
+          description: Either what Coach understood, or a supportive message when the text suggests distress (no targets or suggestions are given then)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/UnderstandResponse" }
+        "503": { description: Coach is not available }
+  /api/coach/suggest:
+    post:
+      operationId: suggestItems
+      summary: Suggest cart additions (needs a user). Gemini chooses among eligible products; every number is checked against the catalog before it is returned.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [profile, cart]
+              properties:
+                profile: { $ref: "#/components/schemas/Profile" }
+                cart:
+                  type: array
+                  description: The user's own items only
+                  items:
+                    type: object
+                    required: [product_id, quantity]
+                    properties:
+                      product_id: { type: integer }
+                      quantity: { type: integer, minimum: 1, maximum: 50 }
+                excluded_product_ids:
+                  type: array
+                  description: Suggestions the user already removed. Do not suggest these again.
+                  items: { type: integer }
+      responses:
+        "200":
+          description: Suggestions, possibly empty
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [suggestions, log]
+                properties:
+                  suggestions:
+                    type: array
+                    items: { $ref: "#/components/schemas/Suggestion" }
+                  log: { $ref: "#/components/schemas/LogEntry" }
+        "403": { description: Auto-add is off in this profile }
+        "429": { description: Too many requests }
+  /api/decisions:
+    get:
+      operationId: listDecisions
+      summary: The user's decision log, newest first (needs a user)
+      responses:
+        "200":
+          description: Log entries
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [decisions]
+                properties:
+                  decisions:
+                    type: array
+                    items: { $ref: "#/components/schemas/LogEntry" }
+    post:
+      operationId: addDecision
+      summary: Record something the user did, such as keeping or removing a suggestion (needs a user)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/LogEntry" }
+      responses:
+        "204": { description: Saved }
+components:
+  schemas:
+    User:
+      type: object
+      required: [id, email, name]
+      properties:
+        id: { type: integer }
+        email: { type: string }
+        name: { type: string }
+    Product:
+      type: object
+      required: [id, name, price, diet, allergens]
+      properties:
+        id: { type: integer }
+        name: { type: string, description: "Includes brand and pack size, for example 'Kisan Fresh Masala Peanuts 150 g'" }
+        brand: { type: string, nullable: true }
+        category: { type: string, nullable: true }
+        price: { type: number, description: Demo price in rupees }
+        protein_g: { type: number, nullable: true, description: Per 100 g (or 100 ml) }
+        calories: { type: integer, nullable: true, description: kcal per 100 g (or 100 ml) }
+        image_url: { type: string, nullable: true }
+        diet: { type: string, enum: [veg, egg, non-veg, unknown] }
+        allergens:
+          type: array
+          description: "Tags such as peanuts, tree-nuts, dairy, egg, gluten, soy, fish, honey"
+          items: { type: string }
+    Diet:
+      type: string
+      enum: [veg, vegan, eggetarian, non-veg, unknown]
+    Profile:
+      type: object
+      required: [protein_target_g, diet, allergies, likes, budget, auto_add]
+      properties:
+        protein_target_g: { type: integer, minimum: 30, maximum: 200 }
+        diet: { $ref: "#/components/schemas/Diet" }
+        allergies: { type: array, items: { type: string } }
+        likes: { type: array, items: { type: string } }
+        budget: { type: number, minimum: 50, maximum: 5000, description: Rupees for this cart }
+        auto_add: { type: boolean, description: The user's consent to pre-fill the cart }
+    SavedProfile:
+      allOf:
+        - $ref: "#/components/schemas/Profile"
+        - type: object
+          required: [goal_text]
+          properties:
+            goal_text: { type: string, minLength: 8, maxLength: 500, description: The user's own words, kept so they can retake them }
+    Understanding:
+      type: object
+      required: [protein_target_g, diet, allergies, likes]
+      properties:
+        protein_target_g: { type: integer, minimum: 30, maximum: 200 }
+        diet: { $ref: "#/components/schemas/Diet" }
+        allergies: { type: array, items: { type: string } }
+        likes: { type: array, items: { type: string } }
+    UnderstandResponse:
+      type: object
+      description: Exactly one of the two fields is set
+      properties:
+        understanding: { $ref: "#/components/schemas/Understanding" }
+        support_message: { type: string }
+    Suggestion:
+      type: object
+      required: [product_id, protein_g, price, reason]
+      properties:
+        product_id: { type: integer }
+        protein_g: { type: number, description: Protein in the whole pack, from the catalog }
+        price: { type: number, description: From the catalog }
+        reason: { type: string, description: "One line shown on the cart item, built from the catalog numbers" }
+        why: { type: string, description: Short plain-words reason written by the model, never contains digits }
+    LogEntry:
+      type: object
+      required: [title, detail]
+      properties:
+        title: { type: string, maxLength: 200 }
+        detail: { type: string, maxLength: 2000, description: Where each number came from }
+        created_at: { type: string, format: date-time }

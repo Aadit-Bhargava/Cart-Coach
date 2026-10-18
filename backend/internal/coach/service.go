@@ -1,0 +1,110 @@
+package coach
+
+import (
+	"context"
+	"fmt"
+	"log"
+	"strings"
+
+	"github.com/aaditbhargava/cart-coach/internal/model"
+	"github.com/aaditbhargava/cart-coach/internal/repository"
+)
+
+type Service struct {
+	products  *repository.ProductRepository
+	gemini    *Gemini
+	decisions *repository.DecisionRepository
+}
+
+func NewService(products *repository.ProductRepository, gemini *Gemini, decisions *repository.DecisionRepository) *Service {
+	return &Service{products: products, gemini: gemini, decisions: decisions}
+}
+
+func (s *Service) Gemini() *Gemini { return s.gemini }
+
+type SuggestResult struct {
+	Suggestions []model.Suggestion `json:"suggestions"`
+	Log         model.Decision     `json:"log"`
+}
+
+// Suggest plans, asks Gemini to choose, verifies the choice and logs it. If
+// Gemini is unavailable it falls back to the plain ranking and says so in the log.
+func (s *Service) Suggest(ctx context.Context, userID int64, in Input) (*SuggestResult, error) {
+	all, err := s.products.All(ctx)
+	if err != nil {
+		return nil, err
+	}
+	byID, _ := s.products.ByID(ctx)
+	plan := BuildPlan(all, in)
+
+	res := &SuggestResult{Suggestions: []model.Suggestion{}}
+	if len(plan.Candidates) == 0 {
+		res.Log = model.Decision{Title: "No suggestions needed", Detail: noneDetail(plan)}
+		s.record(ctx, userID, res.Log)
+		return res, nil
+	}
+
+	cartNames := []string{}
+	for _, it := range in.Cart {
+		if p, ok := byID[it.ProductID]; ok {
+			cartNames = append(cartNames, p.Name)
+		}
+	}
+
+	source := "chosen by " + s.gemini.Model
+	choices, err := s.gemini.Choose(ctx, in.Profile, cartNames, plan)
+	if err != nil {
+		log.Printf("coach: gemini choose failed, using fallback ranking: %v", err)
+		source = "Gemini was unavailable, so the rule-based ranking was used"
+		choices = nil
+	}
+	if choices != nil {
+		res.Suggestions = Verify(choices, plan)
+	}
+	if len(res.Suggestions) == 0 {
+		// The model picked nothing usable (or was unavailable): use the ranking.
+		res.Suggestions = Fallback(plan)
+		if choices != nil {
+			source = "the model's picks failed verification, so the rule-based ranking was used"
+		}
+	}
+
+	protein, cost := 0.0, 0.0
+	lines := make([]string, 0, len(res.Suggestions))
+	for _, sg := range res.Suggestions {
+		p := byID[sg.ProductID]
+		protein += sg.ProteinG
+		cost += sg.Price
+		lines = append(lines, fmt.Sprintf("%s: %s g protein per 100 g × pack = %s g; ₹%s (demo price)", p.Name, trim(*p.ProteinG), trim(sg.ProteinG), trim(sg.Price)))
+	}
+	res.Log = model.Decision{
+		Title:  fmt.Sprintf("Coach suggests %d %s (+%s g protein, +₹%s)", len(res.Suggestions), plural(len(res.Suggestions)), trim(round1(protein)), trim(cost)),
+		Detail: strings.Join(lines, " | ") + ". Numbers come from the catalog (demo data); " + source + ".",
+	}
+	s.record(ctx, userID, res.Log)
+	return res, nil
+}
+
+func noneDetail(plan Plan) string {
+	switch {
+	case plan.Gap < minGap:
+		return "Your protein goal is covered by your own items."
+	case plan.BudgetLeft <= 0:
+		return "Your cart already uses your whole budget."
+	default:
+		return "Nothing in the catalog fits your goal, diet, allergies and budget."
+	}
+}
+
+func plural(n int) string {
+	if n == 1 {
+		return "item"
+	}
+	return "items"
+}
+
+func (s *Service) record(ctx context.Context, userID int64, d model.Decision) {
+	if err := s.decisions.Add(ctx, userID, d); err != nil {
+		log.Printf("coach: could not save decision log entry: %v", err)
+	}
+}

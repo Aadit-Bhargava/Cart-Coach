@@ -1,0 +1,34 @@
+import { z } from "zod";
+import type { Profile, SuggestResponse, UnderstandResponse, Understanding } from "./types";
+
+export const dietSchema = z.enum(["veg", "vegan", "eggetarian", "non-veg", "unknown"]);
+
+export const understandingSchema = z.object({
+  protein_target_g: z.number().int().min(30).max(200),
+  diet: dietSchema,
+  allergies: z.array(z.string()),
+  likes: z.array(z.string()),
+}) satisfies z.ZodType<Understanding>;
+
+export const profileSchema = understandingSchema.extend({
+  budget: z.number().min(50),
+  auto_add: z.boolean(),
+}) satisfies z.ZodType<Profile>;
+
+export const understandResponseSchema = z.object({
+  understanding: understandingSchema.optional(),
+  support_message: z.string().optional(),
+}) satisfies z.ZodType<UnderstandResponse>;
+
+export const suggestResponseSchema = z.object({
+  suggestions: z.array(
+    z.object({
+      product_id: z.number().int(),
+      protein_g: z.number(),
+      price: z.number(),
+      reason: z.string(),
+      why: z.string().optional(),
+    }),
+  ),
+  log: z.object({ title: z.string(), detail: z.string(), created_at: z.string().optional() }),
+}) satisfies z.ZodType<SuggestResponse>;

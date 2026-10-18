@@ -1,0 +1,121 @@
+@import "tailwindcss";
+
+@theme {
+  --color-ground: #f3f2f8;
+  --color-ink: #1b1b3a;
+  --color-muted: #5e5e7e;
+  --color-line: #e2e1ec;
+  --color-tile: #e7e6f0;
+  --color-coach: #5233e6;
+  --color-coach-press: #3f23c7;
+  --color-coach-tint: #ece8fd;
+  --font-display: "Bricolage Grotesque", "Hanken Grotesk", system-ui, sans-serif;
+  --font-sans: "Hanken Grotesk", system-ui, sans-serif;
+  --ease-out-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+@layer base {
+  body {
+    @apply bg-ground font-sans text-[15px] leading-[1.45] text-ink;
+    font-variant-numeric: tabular-nums;
+  }
+  button {
+    @apply cursor-pointer;
+  }
+  :focus-visible {
+    @apply outline-3 outline-offset-2 outline-coach;
+  }
+}
+
+/* Dialogs: native <dialog> gives focus trapping and Escape for free. */
+dialog.sheet {
+  @apply m-0 overflow-y-auto bg-white p-0 text-ink;
+  max-height: none;
+  transition:
+    translate 0.4s var(--ease-out-soft),
+    opacity 0.25s,
+    overlay 0.4s allow-discrete,
+    display 0.4s allow-discrete;
+}
+dialog.sheet::backdrop {
+  background: rgb(27 27 58 / 0.45);
+  transition:
+    opacity 0.3s,
+    overlay 0.4s allow-discrete,
+    display 0.4s allow-discrete;
+  opacity: 0;
+}
+dialog.sheet[open]::backdrop {
+  opacity: 1;
+}
+@starting-style {
+  dialog.sheet[open]::backdrop {
+    opacity: 0;
+  }
+}
+dialog.sheet-side {
+  inset: 12px 12px 12px auto;
+  width: min(480px, calc(100vw - 24px));
+  height: calc(100dvh - 24px);
+  border-radius: 24px;
+  translate: calc(100% + 24px) 0;
+}
+dialog.sheet-side[open] {
+  translate: 0 0;
+}
+@starting-style {
+  dialog.sheet-side[open] {
+    translate: calc(100% + 24px) 0;
+  }
+}
+dialog.sheet-center {
+  inset: 0;
+  margin: auto;
+  width: min(580px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
+  border-radius: 24px;
+  opacity: 0;
+  translate: 0 12px;
+}
+dialog.sheet-center[open] {
+  opacity: 1;
+  translate: 0 0;
+}
+@starting-style {
+  dialog.sheet-center[open] {
+    opacity: 0;
+    translate: 0 12px;
+  }
+}
+@media (max-width: 640px) {
+  dialog.sheet-side {
+    inset: auto 0 0 0;
+    width: 100%;
+    height: auto;
+    max-height: 92dvh;
+    border-radius: 24px 24px 0 0;
+    translate: 0 100%;
+  }
+  dialog.sheet-side[open] {
+    translate: 0 0;
+  }
+  @starting-style {
+    dialog.sheet-side[open] {
+      translate: 0 100%;
+    }
+  }
+}
+
+@keyframes spin {
+  to {
+    rotate: 360deg;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

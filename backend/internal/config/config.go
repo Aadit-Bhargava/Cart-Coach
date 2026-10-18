@@ -19,6 +19,9 @@ type Config struct {
 	DBUser     string
 	DBPassword string
 	Port       string
+
+	GeminiAPIKey string // GEMINI_API_KEY; empty means AI routes answer 503
+	GeminiModel  string // GEMINI_MODEL, default gemini-3.1-flash-lite
 }
 
 // New loads .env (if present) and builds a Config from the environment.
@@ -36,6 +39,9 @@ func New() (*Config, error) {
 		DBUser:     os.Getenv("DB_USER"),
 		DBPassword: os.Getenv("DB_PASSWORD"),
 		Port:       getenv("PORT", "8080"),
+
+		GeminiAPIKey: os.Getenv("GEMINI_API_KEY"),
+		GeminiModel:  getenv("GEMINI_MODEL", "gemini-3.1-flash-lite"),
 	}
 	if cfg.URL != "" {
 		return cfg, nil
