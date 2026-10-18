@@ -18,8 +18,7 @@ export function TopBar({ query, onQuery, profile, onGoal, count, onCart, showCar
     <header className="sticky top-0 z-20 border-b border-line bg-ground/90 backdrop-blur">
       <div className="mx-auto grid max-w-[1560px] grid-cols-[minmax(0,1fr)_auto] items-center gap-x-6 gap-y-3 px-4 py-3 md:px-7 lg:grid-cols-[220px_1fr_auto]">
         <div className="font-display text-2xl font-extrabold tracking-tight">
-          Nukkad
-          <small className="-mt-0.5 block font-sans text-xs font-medium tracking-normal text-muted">with Cart Coach</small>
+          Cart Coach
         </div>
         <search className="relative order-last col-span-2 max-w-[620px] lg:order-none lg:col-span-1">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden className="absolute left-3.5 top-3.5 size-5 text-muted">
