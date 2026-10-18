@@ -8,6 +8,7 @@ import { whatToDo } from "@/lib/errors";
 import { plural } from "@/lib/format";
 import { DIET_LABEL, describeProfile, splitList } from "@/lib/profile";
 import { cartTarget, MAX_DAILY, MIN_DAILY, readStats } from "@/lib/target";
+import { applyUnderstanding } from "@/lib/understanding";
 import { useDispatch, useStore } from "@/state/store";
 
 type Step = "describe" | "understanding" | "confirm";
@@ -61,13 +62,14 @@ export function GoalContent({ first, mode, onDone }: Props) {
   const understand = useMutation({
     mutationFn: (v: { text: string; stats: StatsInput }) => api.understandGoal(v.text, v.stats),
     onSuccess: (u) => {
-      setActivity(u.activity);
-      setDaily(u.daily_protein_g);
+      const next = applyUnderstanding(mode, { diet, allergies, likes }, u);
+      setActivity(next.activity);
+      setDaily(next.daily);
       setDailyEdited(false);
-      setBasis(u.basis);
-      setDiet(u.diet);
-      setAllergies(u.allergies.join(", "));
-      setLikes(u.likes.join(", "));
+      setBasis(next.basis);
+      setDiet(next.diet);
+      setAllergies(next.allergies);
+      setLikes(next.likes);
       setStep("confirm");
     },
     onError: () => setStep("describe"),
