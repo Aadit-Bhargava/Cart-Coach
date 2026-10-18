@@ -47,19 +47,35 @@ func TestPreferenceWords(t *testing.T) {
 }
 
 func TestPreferenceMessage(t *testing.T) {
-	if got := PreferenceMessage("", 0); got != "" {
+	if got := PreferenceMessage("", 0, Miss{}); got != "" {
 		t.Errorf("no preference must give no message, got %q", got)
 	}
-	if got := PreferenceMessage("paneer", 3); got != "" {
+	if got := PreferenceMessage("paneer", 3, Miss{Kind: MissProfile, Cause: "you avoid dairy"}); got != "" {
 		t.Errorf("a preference that matched must give no message, got %q", got)
 	}
-	got := PreferenceMessage("sushi", 0)
-	if !strings.Contains(got, "sushi") || !strings.Contains(got, "fits your goal, diet and budget") {
-		t.Errorf("message = %q", got)
-	}
-	long := PreferenceMessage(strings.Repeat("x", 100), 0)
+	long := PreferenceMessage(strings.Repeat("x", 100), 0, Miss{})
 	if strings.Count(long, "x") > 40 {
 		t.Errorf("a long request must be shortened in the message, got %q", long)
+	}
+	cases := []struct {
+		miss Miss
+		want string
+	}{
+		{Miss{}, "couldn't find"},
+		{Miss{Kind: MissProfile, Cause: "you avoid dairy"}, "you avoid dairy"},
+		{Miss{Kind: MissProfile, Cause: "you avoid dairy"}, "Edit"},
+		{Miss{Kind: MissProtein}, "high-protein"},
+		{Miss{Kind: MissBudget}, "budget"},
+		{Miss{Kind: MissGap}, "more protein than you still need"},
+		{Miss{Kind: MissInCart}, "already have"},
+		{Miss{Kind: MissRemoved}, "removed"},
+		{Miss{Kind: MissCovered}, "already covered"},
+		{Miss{Kind: MissSpent}, "whole budget"},
+	}
+	for _, c := range cases {
+		if got := PreferenceMessage("paneer", 0, c.miss); !strings.Contains(got, c.want) || !strings.Contains(got, "paneer") {
+			t.Errorf("PreferenceMessage(paneer, miss %+v) = %q, want it to mention paneer and %q", c.miss, got, c.want)
+		}
 	}
 }
 
@@ -144,4 +160,74 @@ func TestBuildPlanListsWhatTheShopperRejected(t *testing.T) {
 	if !reflect.DeepEqual(plan.Rejected, []string{"Kisan Fresh Rajma 1 kg"}) {
 		t.Errorf("Rejected = %v", plan.Rejected)
 	}
+}
+
+func TestBuildPlanSaysWhyTheRequestWasLeftOut(t *testing.T) {
+	paneer := prod(2, "Sunrise Foods Paneer 200 g", "Dairy", "veg", 170, 18, "dairy") // 36 g
+	other := prod(1, "Kisan Fresh Rajma 1 kg", "Staples", "veg", 100, 22)
+	base := func() Input { return Input{Profile: prefProfile(), Days: 3, DailyProteinG: 110, Preference: "paneer"} }
+
+	t.Run("a dairy allergy", func(t *testing.T) {
+		in := base()
+		in.Profile.Allergies = []string{"dairy"}
+		plan := BuildPlan([]model.Product{other, paneer}, in)
+		if plan.PreferenceMiss.Kind != MissProfile || plan.PreferenceMiss.Cause != "you avoid dairy" {
+			t.Errorf("miss = %+v, want the dairy allergy", plan.PreferenceMiss)
+		}
+	})
+	t.Run("a vegan diet", func(t *testing.T) {
+		in := base()
+		in.Profile.Diet = "vegan"
+		plan := BuildPlan([]model.Product{other, paneer}, in)
+		if plan.PreferenceMiss.Kind != MissProfile || plan.PreferenceMiss.Cause != "your diet is vegan" {
+			t.Errorf("miss = %+v, want the vegan diet", plan.PreferenceMiss)
+		}
+	})
+	t.Run("not in the store", func(t *testing.T) {
+		plan := BuildPlan([]model.Product{other}, base())
+		if plan.PreferenceMiss.Kind != MissNone || plan.PreferenceMatches != 0 {
+			t.Errorf("miss = %+v matches = %d, want nothing found", plan.PreferenceMiss, plan.PreferenceMatches)
+		}
+	})
+	t.Run("over the budget left", func(t *testing.T) {
+		in := base()
+		in.Profile.Budget = 100
+		plan := BuildPlan([]model.Product{other, paneer}, in)
+		if plan.PreferenceMiss.Kind != MissBudget {
+			t.Errorf("miss = %+v, want budget", plan.PreferenceMiss)
+		}
+	})
+	t.Run("removed earlier", func(t *testing.T) {
+		in := base()
+		in.Excluded = []int64{2}
+		plan := BuildPlan([]model.Product{other, paneer}, in)
+		if plan.PreferenceMiss.Kind != MissRemoved {
+			t.Errorf("miss = %+v, want removed", plan.PreferenceMiss)
+		}
+	})
+	t.Run("goal already covered", func(t *testing.T) {
+		in := base()
+		in.Profile.ProteinTargetG = 3
+		plan := BuildPlan([]model.Product{other, paneer}, in)
+		if plan.PreferenceMiss.Kind != MissCovered {
+			t.Errorf("miss = %+v, want covered", plan.PreferenceMiss)
+		}
+	})
+	t.Run("the closest reason wins", func(t *testing.T) {
+		// One paneer is blocked by the allergy, another only costs too much: say the budget.
+		cheapDairyFree := prod(3, "Soy Paneer 200 g", "Staples", "veg", 900, 18)
+		in := base()
+		in.Profile.Allergies = []string{"dairy"}
+		in.Profile.Budget = 500
+		plan := BuildPlan([]model.Product{paneer, cheapDairyFree}, in)
+		if plan.PreferenceMiss.Kind != MissBudget {
+			t.Errorf("miss = %+v, want budget", plan.PreferenceMiss)
+		}
+	})
+	t.Run("nothing to explain when it was found", func(t *testing.T) {
+		plan := BuildPlan([]model.Product{other, paneer}, base())
+		if plan.PreferenceMatches != 1 || plan.PreferenceMiss.Kind != MissNone {
+			t.Errorf("matches = %d miss = %+v", plan.PreferenceMatches, plan.PreferenceMiss)
+		}
+	})
 }

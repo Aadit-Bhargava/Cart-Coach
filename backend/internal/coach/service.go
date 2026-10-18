@@ -60,8 +60,9 @@ func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartIt
 	plan := BuildPlan(all, in)
 
 	res := &SuggestResult{Suggestions: []model.Suggestion{}}
+	res.Message = PreferenceMessage(plan.Preference, plan.PreferenceMatches, plan.PreferenceMiss)
 	if len(plan.Candidates) == 0 {
-		res.Log = model.Decision{Title: "No suggestions needed", Detail: noneDetail(plan)}
+		res.Log = model.Decision{Title: "No suggestions needed", Detail: noneDetail(plan) + askedNote(res.Message)}
 		s.record(ctx, userID, res.Log)
 		return res, nil
 	}
@@ -82,7 +83,7 @@ func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartIt
 	}
 	if err == nil && len(choices) == 0 {
 		// The model looked at the shortlist and chose nothing: respect that.
-		res.Log = model.Decision{Title: "No suggestions needed", Detail: "Coach didn't find anything that fits your goal better than what is already in your cart."}
+		res.Log = model.Decision{Title: "No suggestions needed", Detail: "Coach didn't find anything that fits your goal better than what is already in your cart." + askedNote(res.Message)}
 		s.record(ctx, userID, res.Log)
 		return res, nil
 	}
@@ -107,9 +108,8 @@ func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartIt
 	}
 	res.Log = model.Decision{
 		Title:  fmt.Sprintf("Coach suggests %d %s (+%s g protein, +₹%s)", len(res.Suggestions), plural(len(res.Suggestions)), trim(round1(protein)), trim(cost)),
-		Detail: strings.Join(lines, " | ") + ". Numbers come from the product catalog (demo data); " + source + "." + askedFor(in.Preference),
+		Detail: strings.Join(lines, " | ") + ". Numbers come from the product catalog (demo data); " + source + "." + askedFor(in.Preference) + askedNote(res.Message),
 	}
-	res.Message = PreferenceMessage(plan.Preference, plan.PreferenceMatches)
 	s.record(ctx, userID, res.Log)
 	return res, nil
 }
@@ -144,4 +144,12 @@ func askedFor(preference string) string {
 		return ""
 	}
 	return " You asked for: " + preference + "."
+}
+
+// askedNote adds why the shopper's request was left out to the decision log entry.
+func askedNote(message string) string {
+	if message == "" {
+		return ""
+	}
+	return " " + message
 }
