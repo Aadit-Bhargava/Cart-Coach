@@ -2,6 +2,7 @@ package coach
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
@@ -14,13 +15,20 @@ type Service struct {
 	products  *repository.ProductRepository
 	gemini    *Gemini
 	decisions *repository.DecisionRepository
+	profiles  *repository.ProfileRepository
 }
 
-func NewService(products *repository.ProductRepository, gemini *Gemini, decisions *repository.DecisionRepository) *Service {
-	return &Service{products: products, gemini: gemini, decisions: decisions}
+func NewService(products *repository.ProductRepository, gemini *Gemini, decisions *repository.DecisionRepository, profiles *repository.ProfileRepository) *Service {
+	return &Service{products: products, gemini: gemini, decisions: decisions, profiles: profiles}
 }
 
 func (s *Service) Gemini() *Gemini { return s.gemini }
+
+// ErrDetailsMissing means the saved profile has no age, weight and height yet.
+var ErrDetailsMissing = errors.New("profile details missing")
+
+// ErrAutoAddOff means the user has not opted in to suggestions.
+var ErrAutoAddOff = errors.New("auto-add is off")
 
 type SuggestResult struct {
 	Suggestions []model.Suggestion `json:"suggestions"`
@@ -29,7 +37,19 @@ type SuggestResult struct {
 
 // Suggest plans, asks Gemini to choose, verifies the choice and logs it. If
 // Gemini is unavailable it falls back to the plain ranking and says so in the log.
-func (s *Service) Suggest(ctx context.Context, userID int64, in Input) (*SuggestResult, error) {
+func (s *Service) Suggest(ctx context.Context, userID int64, cart []model.CartItem, excluded []int64) (*SuggestResult, error) {
+	saved, err := s.profiles.Get(ctx, userID)
+	if errors.Is(err, repository.ErrProfileNotFound) || (err == nil && !saved.DetailsComplete) {
+		return nil, ErrDetailsMissing
+	}
+	if err != nil {
+		return nil, err
+	}
+	if !saved.AutoAdd {
+		return nil, ErrAutoAddOff
+	}
+	in := Input{Profile: saved.Profile, Cart: cart, Excluded: excluded, Days: saved.Days, DailyProteinG: saved.DailyProteinG}
+
 	all, err := s.products.All(ctx)
 	if err != nil {
 		return nil, err
@@ -58,11 +78,17 @@ func (s *Service) Suggest(ctx context.Context, userID int64, in Input) (*Suggest
 		source = "Coach's AI was unavailable, so items were ranked by protein per rupee instead"
 		choices = nil
 	}
+	if err == nil && len(choices) == 0 {
+		// The model looked at the shortlist and chose nothing: respect that.
+		res.Log = model.Decision{Title: "No suggestions needed", Detail: "Coach didn't find anything that fits your goal better than what is already in your cart."}
+		s.record(ctx, userID, res.Log)
+		return res, nil
+	}
 	if choices != nil {
 		res.Suggestions = Verify(choices, plan)
 	}
 	if len(res.Suggestions) == 0 {
-		// The model picked nothing usable (or was unavailable): use the ranking.
+		// The call failed, or none of the model's picks passed verification: use the ranking.
 		res.Suggestions = Fallback(plan)
 		if choices != nil {
 			source = "Coach's first picks didn't pass our checks, so items were ranked by protein per rupee instead"

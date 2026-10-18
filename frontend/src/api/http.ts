@@ -1,5 +1,6 @@
 import {
   logEntriesSchema,
+  profileTargetSchema,
   savedProfileSchema,
   suggestResponseSchema,
   understandResponseSchema,
@@ -95,8 +96,12 @@ export const httpApi: CartCoachApi = {
     return data.products;
   },
 
-  async understandGoal(text) {
-    const res = understandResponseSchema.parse(await send("POST", "/api/profile/understand", { text }));
+  async profileTarget(stats, activity) {
+    return profileTargetSchema.parse(await send("POST", "/api/profile/target", { ...stats, activity }));
+  },
+
+  async understandGoal(text, stats) {
+    const res = understandResponseSchema.parse(await send("POST", "/api/profile/understand", { text, ...stats }));
     if (res.support_message) throw new SupportMessage(res.support_message);
     if (!res.understanding) throw new ApiError("Empty response from /api/profile/understand", 200);
     return res.understanding;

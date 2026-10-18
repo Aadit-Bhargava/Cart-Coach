@@ -1,7 +1,8 @@
 // Rule-based stand-in for the Coach (Gemini goal understanding, suggestion
 // picking and the Verifier). Used only by the demo API. Nothing here is medical
 // or dietary advice: it matches protein to a number the user can change.
-import type { Diet, Profile, Understanding } from "@/api/types";
+import type { Diet, Profile } from "@/api/types";
+import type { Activity } from "./target";
 import { grams, inr } from "./format";
 import type { ProductView } from "./product";
 
@@ -21,11 +22,26 @@ export function isAllowed(p: ProductView, profile: Profile): boolean {
   return true;
 }
 
-export function understandText(text: string): Understanding {
+export interface TextReading {
+  activity: Activity;
+  diet: Diet;
+  allergies: string[];
+  likes: string[];
+  /** A daily protein amount the text states, or 0. */
+  stated: number;
+}
+
+/** A rough, rule-based reading of the goal text, standing in for Gemini in demo mode. */
+export function understandText(text: string): TextReading {
   const t = text.toLowerCase();
-  const stated = /(\d{2,3})\s*g\b/.exec(t)?.[1];
-  const trains = /ironman|marathon|triathlon|train|gym|lift|muscle|athlet|run/.test(t);
-  const protein = Math.min(200, Math.max(30, stated ? Number(stated) : trains ? 110 : 70));
+  const stated = Number(/(\d{2,3})\s*g\b/.exec(t)?.[1] ?? 0);
+  const activity: Activity = /ironman|marathon|triathlon|running|runner|cycling|swimming|\brun\b/.test(t)
+    ? "endurance"
+    : /gym|lift|muscle|bodybuild|powerlift|bulk/.test(t)
+      ? "strength"
+      : /football|cricket|sport|exercise|workout|yoga|train/.test(t)
+        ? "active"
+        : "general";
   const diet: Diet = /vegan/.test(t)
     ? "vegan"
     : /egg/.test(t) && /veg/.test(t)
@@ -39,7 +55,7 @@ export function understandText(text: string): Understanding {
   const likes = ["paneer", "peanut", "oats", "dal", "makhana", "rajma", "chana", "lassi", "muesli", "tofu", "eggs"].filter(
     (w) => t.includes(w) && !(w === "peanut" && allergies.includes("peanuts")),
   );
-  return { protein_target_g: protein, diet, allergies, likes };
+  return { activity, diet, allergies, likes, stated };
 }
 
 export interface PickInput {

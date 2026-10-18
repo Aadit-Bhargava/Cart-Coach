@@ -3,7 +3,10 @@ import extraProducts from "@/demo/products.extra.json";
 import { grams, inr, plural } from "@/lib/format";
 import { pickSuggestions, reasonFor, sourceFor, understandText } from "@/lib/coach";
 import { toView, type ProductView } from "@/lib/product";
-import type { CartCoachApi, Product } from "./types";
+import { dailyProtein, detailsComplete, resolveDaily } from "@/lib/target";
+import { ApiError } from "./http";
+import { profileSchema } from "./validate";
+import type { CartCoachApi, Product, Profile } from "./types";
 
 const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -11,6 +14,21 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const products = [...baseProducts, ...extraProducts] as Product[];
 const views: ProductView[] = products.map(toView);
 const byId = new Map(views.map((v) => [v.id, v]));
+
+const STORAGE_KEY = "cartcoach.goal"; // written by the store in demo mode
+
+/** The real service keeps the profile on the server; the demo reads the one the store saved. */
+function savedProfile(): Profile | null {
+  try {
+    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) ?? "null") as { profile?: unknown } | null;
+    const parsed = profileSchema.safeParse(data?.profile);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+const toStats = (s: { age_years: number; weight_kg: number; height_cm: number }) => ({ ageYears: s.age_years, weightKg: s.weight_kg, heightCm: s.height_cm });
 
 /** Runs the whole backend in the browser: generated sample data and a rule-based Coach. */
 export const demoApi: CartCoachApi = {
@@ -39,13 +57,24 @@ export const demoApi: CartCoachApi = {
     return products;
   },
 
-  async understandGoal(text) {
+  async understandGoal(text, stats) {
     await delay(1100);
-    return understandText(text);
+    const r = understandText(text);
+    const { grams, basis } = resolveDaily(toStats(stats), r.activity, r.stated);
+    return { activity: r.activity, diet: r.diet, allergies: r.allergies, likes: r.likes, daily_protein_g: grams, basis };
   },
 
-  async suggestItems({ profile, cart, excluded_product_ids }) {
+  async profileTarget(stats, activity) {
+    const { grams, basis } = dailyProtein(toStats(stats), activity);
+    return { daily_protein_g: grams, basis };
+  },
+
+  async suggestItems({ cart, excluded_product_ids }) {
     await delay(700);
+    const profile = savedProfile();
+    if (!profile || !detailsComplete(profile)) {
+      throw new ApiError("details missing", 409, "Add your age, weight and height so Coach can work out your protein target.");
+    }
     const lines = cart.flatMap((l) => {
       const product = byId.get(l.product_id);
       return product ? [{ product, quantity: l.quantity }] : [];

@@ -45,6 +45,12 @@ create table if not exists user_profiles (
     auto_add         boolean not null,
     updated_at       timestamptz not null default now()
 );
+alter table user_profiles add column if not exists age_years       integer;
+alter table user_profiles add column if not exists weight_kg       numeric(4, 1);
+alter table user_profiles add column if not exists height_cm       numeric(4, 1);
+alter table user_profiles add column if not exists activity        text;
+alter table user_profiles add column if not exists days            integer;
+alter table user_profiles add column if not exists daily_protein_g integer;
 
 create table if not exists coach_decisions (
     id         bigserial primary key,

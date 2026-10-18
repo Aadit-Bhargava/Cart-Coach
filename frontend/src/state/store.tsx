@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useReducer, useRef, type Dispatch, type ReactNode } from "react";
 import { api } from "@/api";
 import { profileSchema } from "@/api/validate";
-import type { LogEntry, Profile, Suggestion } from "@/api/types";
+import type { LogEntry, Profile, SavedProfile, Suggestion } from "@/api/types";
 
 export type Source = "user" | "coach";
 export interface Line {
@@ -29,7 +29,7 @@ export type Action =
   | { type: "step"; id: number; delta: 1 | -1 }
   | { type: "keep"; id: number; name: string }
   | { type: "dismiss"; id: number; name: string }
-  | { type: "loaded"; profile: (Profile & { goal_text: string }) | null; log: LogEntry[] }
+  | { type: "loaded"; profile: SavedProfile | null; log: LogEntry[] }
   | { type: "undoAll" }
   | { type: "clearSuggestions" }
   | { type: "saveProfile"; profile: Profile; text: string; summary: string }
@@ -72,7 +72,7 @@ function reducer(s: State, a: Action): State {
     }
     case "loaded": {
       if (!a.profile) return { ...s, profile: null, goalText: "", log: a.log };
-      const { goal_text, ...profile } = a.profile;
+      const { goal_text, details_complete: _complete, ...profile } = a.profile;
       return { ...s, profile, goalText: goal_text, log: a.log };
     }
     case "keep": {

@@ -11,16 +11,17 @@ import { Session } from "@/features/Session";
 import { useAuth } from "@/state/auth";
 import { CartPanel } from "@/features/CartPanel";
 import { CategoryNav } from "@/features/CategoryNav";
-import { GoalContent } from "@/features/GoalDialog";
+import { GoalContent, type GoalMode } from "@/features/GoalDialog";
 import { SignInContent } from "@/features/SignIn";
 import { LogContent } from "@/features/LogDialog";
 import { ProductCard } from "@/features/ProductCard";
 import { ProductDetail } from "@/features/ProductDetail";
 import { TopBar } from "@/features/TopBar";
 import { whatToDo } from "@/lib/errors";
+import { detailsComplete } from "@/lib/target";
 import { inr, plural } from "@/lib/format";
 
-type Overlay = { kind: "product"; id: number } | { kind: "goal"; first: boolean } | { kind: "log" } | { kind: "signin" } | null;
+type Overlay = { kind: "product"; id: number } | { kind: "goal"; first: boolean; mode: GoalMode } | { kind: "log" } | { kind: "signin" } | null;
 type Sort = "featured" | "low" | "high" | "az";
 const PAGE = 60;
 
@@ -48,20 +49,30 @@ function Shop() {
 
   const [overlay, setOverlay] = useState<Overlay>(null);
   const [firstRunSeen, setFirstRunSeen] = useState(false);
+  const [detailsSkipped, setDetailsSkipped] = useState(false);
   const [railOpen, setRailOpen] = useState(false);
   const [category, setCategory] = useState("All");
   const [query, setQuery] = useState("");
   const [sort, setSort] = useState<Sort>("featured");
+  const [vegOnly, setVegOnly] = useState(false);
   const [shown, setShown] = useState(PAGE);
 
   // Not signed in: the sign-in popup sits over the homepage and cannot be dismissed.
   // Then the goal popup greets a new user once; it stays up until they save or skip.
   const needsSignIn = auth.status === "signedOut" || auth.status === "error";
+  // An account saved before age, weight and height were asked is asked once for them.
+  const needsDetails = auth.ready && Boolean(profile) && !detailsComplete(profile!) && !detailsSkipped;
   const activeOverlay: Overlay = needsSignIn
     ? { kind: "signin" }
-    : (overlay ?? (!firstRunSeen && !profile && auth.ready && status === "success" ? { kind: "goal", first: true } : null));
+    : (overlay ??
+      (needsDetails
+        ? { kind: "goal", first: false, mode: "details" }
+        : !firstRunSeen && !profile && auth.ready && status === "success"
+          ? { kind: "goal", first: true, mode: "full" }
+          : null));
   const closeOverlay = () => {
     setFirstRunSeen(true);
+    setDetailsSkipped(true);
     setOverlay(null);
   };
 
@@ -73,15 +84,21 @@ function Shop() {
 
   const visible = useMemo(() => {
     const q = query.trim().toLowerCase();
-    const list = products.filter((p) => (category === "All" || p.category === category) && (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)));
+    const list = products.filter(
+      (p) =>
+        (category === "All" || p.category === category) &&
+        (!vegOnly || p.diet === "veg") &&
+        (!q || p.name.toLowerCase().includes(q) || p.category.toLowerCase().includes(q)),
+    );
     if (sort === "low") list.sort((a, b) => a.price - b.price);
     if (sort === "high") list.sort((a, b) => b.price - a.price);
     if (sort === "az") list.sort((a, b) => a.name.localeCompare(b.name));
     return list;
-  }, [products, category, query, sort]);
+  }, [products, category, query, sort, vegOnly]);
 
   const product = activeOverlay?.kind === "product" ? byId.get(activeOverlay.id) : undefined;
-  const openGoal = () => setOverlay({ kind: "goal", first: false });
+  const openDetails = () => setOverlay({ kind: "goal", first: false, mode: "details" });
+  const openGoal = () => setOverlay({ kind: "goal", first: false, mode: "full" });
   const openLog = () => setOverlay({ kind: "log" });
   const resetPage = () => setShown(PAGE);
 
@@ -114,13 +131,29 @@ function Shop() {
         />
 
         <main className="min-w-0">
-          <div className="mb-4 flex items-end justify-between gap-4">
+          <div className="mb-4 flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
             <div>
               <h1 className="font-display text-3xl font-extrabold leading-[1.05] tracking-tight md:text-[2.1rem]">{category === "All" ? "All products" : category}</h1>
               <p className="mt-1 text-muted" aria-live="polite">
-                {status === "success" ? `${plural(visible.length, "product", "products")}${query ? ` matching "${query}"` : ""}` : ""}
+                {status === "success" ? `${plural(visible.length, "product", "products")}${vegOnly ? ", veg only" : ""}${query ? ` matching "${query}"` : ""}` : ""}
               </p>
             </div>
+            <div className="flex items-center gap-3">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={vegOnly}
+              onClick={() => {
+                setVegOnly((v) => !v);
+                resetPage();
+              }}
+              className="flex min-h-11 items-center gap-2 whitespace-nowrap rounded-xl text-sm font-medium"
+            >
+              <span aria-hidden className={`relative h-6 w-10 rounded-full transition-colors ${vegOnly ? "bg-[#1a8f3c]" : "bg-line"}`}>
+                <span className={`absolute top-0.5 size-5 rounded-full bg-white shadow transition-[left] ${vegOnly ? "left-[18px]" : "left-0.5"}`} />
+              </span>
+              Veg only
+            </button>
             <label className="flex items-center gap-2 text-sm text-muted">
               <span className="max-sm:sr-only">Sort by</span>
               <select value={sort} onChange={(e) => setSort(e.target.value as Sort)} className="h-11 rounded-xl border border-line bg-white px-3 text-ink">
@@ -130,6 +163,7 @@ function Shop() {
                 <option value="az">Name, A to Z</option>
               </select>
             </label>
+            </div>
           </div>
 
           {status === "pending" && <p role="status" className="rounded-2xl bg-white p-10 text-center text-muted">Loading products...</p>}
@@ -144,8 +178,8 @@ function Shop() {
           )}
           {status === "success" && visible.length === 0 && (
             <div className="rounded-2xl bg-white p-10 text-center text-muted">
-              <b className="block font-display text-lg text-ink">No products match "{query}"</b>
-              Try a different word or clear the search.
+              <b className="block font-display text-lg text-ink">{query ? `No products match "${query}"` : "No products here"}</b>
+              {vegOnly ? "Turn off Veg only or choose another category." : "Try a different word or clear the search."}
             </div>
           )}
           <div className="grid grid-cols-[repeat(auto-fill,minmax(200px,1fr))] gap-[18px] max-sm:grid-cols-2 max-sm:gap-3">
@@ -162,7 +196,7 @@ function Shop() {
 
         {wide && (
           <aside aria-label="Your cart" className="sticky top-[92px] self-start">
-            <CartPanel byId={byId} onGoal={openGoal} onLog={openLog} className="max-h-[calc(100dvh-112px)]" />
+            <CartPanel byId={byId} onGoal={openGoal} onDetails={openDetails} onLog={openLog} className="max-h-[calc(100dvh-112px)]" />
           </aside>
         )}
       </div>
@@ -191,6 +225,10 @@ function Shop() {
               setRailOpen(false);
               openGoal();
             }}
+            onDetails={() => {
+              setRailOpen(false);
+              openDetails();
+            }}
             onLog={() => {
               setRailOpen(false);
               openLog();
@@ -213,6 +251,7 @@ function Shop() {
         {activeOverlay?.kind === "goal" && (
           <GoalContent
             first={activeOverlay.first}
+            mode={activeOverlay.mode}
             onDone={(saved) => {
               if (!saved) toast("You can set a goal any time from the top bar.");
               closeOverlay();

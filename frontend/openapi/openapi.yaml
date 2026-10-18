@@ -6,7 +6,7 @@
 openapi: 3.0.3
 info:
   title: Cart Coach API
-  version: 0.4.0
+  version: 0.5.0
 paths:
   /api/auth/signup:
     post:
@@ -123,9 +123,12 @@ paths:
           application/json:
             schema:
               type: object
-              required: [text]
+              required: [text, age_years, weight_kg, height_cm]
               properties:
                 text: { type: string, minLength: 8, maxLength: 500 }
+                age_years: { type: integer, minimum: 18, maximum: 100 }
+                weight_kg: { type: number, minimum: 30, maximum: 250 }
+                height_cm: { type: number, minimum: 120, maximum: 230 }
       responses:
         "200":
           description: Either what Coach understood, or a supportive message when the text suggests distress (no targets or suggestions are given then)
@@ -133,6 +136,34 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/UnderstandResponse" }
         "503": { description: Coach is not available }
+  /api/profile/target:
+    post:
+      operationId: profileTarget
+      summary: Work out the daily protein for these details and activity (needs a user). Saves nothing.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [age_years, weight_kg, height_cm, activity]
+              properties:
+                age_years: { type: integer, minimum: 18, maximum: 100 }
+                weight_kg: { type: number, minimum: 30, maximum: 250 }
+                height_cm: { type: number, minimum: 120, maximum: 230 }
+                activity: { $ref: "#/components/schemas/Activity" }
+      responses:
+        "200":
+          description: The daily protein and a plain sentence that explains it
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [daily_protein_g, basis]
+                properties:
+                  daily_protein_g: { type: integer, minimum: 40, maximum: 220 }
+                  basis: { type: string }
+        "400": { description: "Invalid details; the body has a plain-language `error`" }
   /api/coach/suggest:
     post:
       operationId: suggestItems
@@ -143,9 +174,8 @@ paths:
           application/json:
             schema:
               type: object
-              required: [profile, cart]
+              required: [cart]
               properties:
-                profile: { $ref: "#/components/schemas/Profile" }
                 cart:
                   type: array
                   description: The user's own items only
@@ -173,6 +203,7 @@ paths:
                     items: { $ref: "#/components/schemas/Suggestion" }
                   log: { $ref: "#/components/schemas/LogEntry" }
         "403": { description: Auto-add is off in this profile }
+        "409": { description: The profile has no age, weight and height yet }
         "429": { description: Too many requests }
   /api/decisions:
     get:
@@ -231,29 +262,41 @@ components:
       enum: [veg, vegan, eggetarian, non-veg, unknown]
     Profile:
       type: object
-      required: [protein_target_g, diet, allergies, likes, budget, auto_add]
+      required: [protein_target_g, diet, allergies, likes, budget, auto_add, age_years, weight_kg, height_cm, activity, days, daily_protein_g]
       properties:
-        protein_target_g: { type: integer, minimum: 30, maximum: 200 }
+        protein_target_g: { type: integer, description: Protein for the whole cart, the daily amount times days. The server computes it and ignores a value sent by the browser. }
         diet: { $ref: "#/components/schemas/Diet" }
         allergies: { type: array, items: { type: string } }
         likes: { type: array, items: { type: string } }
         budget: { type: number, minimum: 50, maximum: 5000, description: Rupees for this cart }
         auto_add: { type: boolean, description: The user's consent to pre-fill the cart }
+        age_years: { type: integer, nullable: true, description: Whole years, 18 to 100. Null on profiles saved before this field existed. }
+        weight_kg: { type: number, nullable: true, description: 30 to 250. Null on older profiles. }
+        height_cm: { type: number, nullable: true, description: 120 to 230. Null on older profiles. }
+        activity: { type: string, description: "One of the Activity values, or an empty string on older profiles" }
+        days: { type: integer, description: "Days the cart covers: 1, 3 or 7, or 0 on older profiles" }
+        daily_protein_g: { type: integer, description: "Daily protein, 40 to 220, or 0 on older profiles" }
+    Activity:
+      type: string
+      enum: [general, active, endurance, strength]
     SavedProfile:
       allOf:
         - $ref: "#/components/schemas/Profile"
         - type: object
-          required: [goal_text]
+          required: [goal_text, details_complete]
           properties:
+            details_complete: { type: boolean, description: "False for profiles saved before the personal details existed; Coach stays paused until they are added" }
             goal_text: { type: string, minLength: 8, maxLength: 500, description: The user's own words, kept so they can retake them }
     Understanding:
       type: object
-      required: [protein_target_g, diet, allergies, likes]
+      required: [activity, diet, allergies, likes, daily_protein_g, basis]
       properties:
-        protein_target_g: { type: integer, minimum: 30, maximum: 200 }
+        activity: { $ref: "#/components/schemas/Activity" }
         diet: { $ref: "#/components/schemas/Diet" }
         allergies: { type: array, items: { type: string } }
         likes: { type: array, items: { type: string } }
+        daily_protein_g: { type: integer, description: "Daily protein from the rule, or the amount the user stated" }
+        basis: { type: string, description: A plain sentence that explains the daily amount }
     UnderstandResponse:
       type: object
       description: Exactly one of the two fields is set
