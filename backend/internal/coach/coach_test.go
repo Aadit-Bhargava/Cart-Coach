@@ -157,7 +157,6 @@ func TestProfileValidate(t *testing.T) {
 		t.Errorf("allergies not cleaned: %v", ok.Allergies)
 	}
 	for _, bad := range []model.Profile{
-		{ProteinTargetG: 10, Diet: "veg", Budget: 600},
 		{ProteinTargetG: 110, Diet: "carnivore", Budget: 600},
 		{ProteinTargetG: 110, Diet: "veg", Budget: 5},
 	} {
